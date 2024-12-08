@@ -2,10 +2,19 @@ from utils import load_config, load_dataset, get_image_processor, collate_fn, co
 from model import load_model
 from config import get_training_args, get_vivit_config
 from trainer import LogTrainer
+import os
+import wandb
 
 def main():
     # Load configuration
     config = load_config()
+
+    output_dir = config["run_name"]
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Log to wandb, they key must be in the file .secrets
+    key = open(".secrets").read().strip()
+    wandb.login(key=key)
 
     # Load dataset and image processor
     dataset = load_dataset(config["dataset_folder"])

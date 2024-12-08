@@ -1,0 +1,14 @@
+accelerate
+av
+datasets
+decord
+evaluate
+matplotlib
+opencv-python
+openpyxl
+pydicom
+torch
+torchvision
+transformers
+wandb
+scikit-learn

@@ -1,6 +1,6 @@
 {
-    "run_name": "vivit_apical4_none_pretrained_modular",
-    "dataset_folder": "../dataset_apical4_none",
+    "run_name": "vivit_apical4_none_pretrained_modular_dockerized",
+    "dataset_folder": "dataset_apical4_none",
     "resize_to": 224,
     "learning_rate": 5e-5,
     "warmup_steps": 100,
