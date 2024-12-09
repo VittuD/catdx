@@ -1,3 +1,6 @@
 .secrets
 .vscode/
 .vivit_apical4_none_pretrained_modular_dockerized/
+dataset_apical4_none/
+catdx/
+.devcontainer/
