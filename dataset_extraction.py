@@ -14,12 +14,15 @@ annotations = pd.read_excel(annotations_path)
 annotations = annotations[['patient', 'CO']]
 annotations.to_csv('annotations_CO.csv', index=False)
 
-def convert_pt_to_mp4(pt_path, pt_filename, output_filename, frame_size=(516, 516), fps=30):
+def convert_pt_to_mp4(pt_path, pt_filename, output_filename, fps=30):
     # Open a pt file with torch
     pt_file = os.path.join(pt_path, pt_filename)
     pt_video = torch.load(pt_file, weights_only=False)
     print(pt_video.shape)
-    
+
+    # Get the frame size from the video shape
+    frame_size = (pt_video.shape[2], pt_video.shape[1])
+
     # Convert it to a video and save it as mp4
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_filename, fourcc, fps, frame_size)
@@ -27,6 +30,7 @@ def convert_pt_to_mp4(pt_path, pt_filename, output_filename, frame_size=(516, 51
     for frame in pt_video:
         frame_np = frame.numpy()  # Convert torch.Tensor to numpy array
         frame_np = (frame_np * 255).astype(np.uint8)  # Scale to 0-255 and convert to uint8
+        # frame_np = cv2.cvtColor(frame_np, cv2.COLOR_GRAY2BGR)  # Convert grayscale to BGR
         out.write(frame_np)
 
     out.release()

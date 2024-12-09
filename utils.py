@@ -16,9 +16,13 @@ def load_dataset(dataset_folder):
     dataset = dataset.rename_column('CO', 'labels')
     return dataset
 
-def preprocess_example(example, image_processor):
+def preprocess_example(example, image_processor, num_frames=32):
     video = example['pixel_values']
     frames = [frame.asnumpy() for frame in video]
+    if len(frames) < num_frames:
+        frames = frames * (num_frames // len(frames)) + frames[:num_frames % len(frames)]
+    else:
+        frames = frames[:num_frames]
     processed_video = image_processor(frames, return_tensors='pt')
     return processed_video['pixel_values']
 
