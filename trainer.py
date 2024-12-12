@@ -1,4 +1,5 @@
 from transformers import Trainer
+from utils import compute_pearson_r2, compute_mae, compute_std
 import torch
 
 class LogTrainer(Trainer):
@@ -12,4 +13,7 @@ class LogTrainer(Trainer):
         outputs = model(**inputs)
         predictions = outputs.logits.squeeze()
         loss = torch.nn.functional.mse_loss(predictions, labels)
+        r2 = compute_pearson_r2(predictions, labels)
+        mae = compute_mae(predictions, labels)
+        std = compute_std(predictions, labels)
         return (loss, outputs) if return_outputs else loss

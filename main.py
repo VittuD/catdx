@@ -4,8 +4,24 @@ from config import get_training_args, get_vivit_config
 from trainer import LogTrainer
 import os
 import wandb
+from model_testing import run_inference_and_save
+from prediction_analysis import generate_predictions_report
+import torch
 
 def main():
+    # Check if CUDA is available
+    if torch.cuda.is_available():
+        # Get the number of GPUs
+        num_gpus = torch.cuda.device_count()
+        print(f"Number of GPUs available: {num_gpus}")
+
+        # List all available GPUs
+        for i in range(num_gpus):
+            gpu_name = torch.cuda.get_device_name(i)
+            print(f"GPU {i}: {gpu_name}")
+    else:
+        print("CUDA is not available. No GPUs detected.")
+
     # Load configuration
     config = load_config()
 
@@ -21,7 +37,7 @@ def main():
     image_processor = get_image_processor(config["resize_to"])
 
     # Load configuration and model
-    num_frames = len(dataset['train'][0]['pixel_values'])
+    num_frames = 32
     model_name = "google/vivit-b-16x2-kinetics400"
     vivit_config = get_vivit_config(num_frames, config["resize_to"], config, model_name)
     model = load_model(vivit_config, model_name)
@@ -44,6 +60,12 @@ def main():
 
     # Save the model
     model.save_pretrained(config["run_name"])
+
+    # Run inference and save results
+    results = run_inference_and_save(config["run_name"], config["dataset_folder"])
+
+    # Generate predictions report
+    generate_predictions_report(results)
 
 if __name__ == "__main__":
     main()
