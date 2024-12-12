@@ -1,0 +1,4 @@
+- weight aumentato a 0.1
+- freezare encoder (tranfer learning: adderstrare solo il layer lineare)
+- Debiasing di cole : class ageEstimatorAdjustedCole (https://pmc.ncbi.nlm.nih.gov/articles/PMC7049655/)
+- aumentare image size a 420

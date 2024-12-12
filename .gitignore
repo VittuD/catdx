@@ -5,3 +5,8 @@ dataset_apical4_none/
 catdx/
 catdx
 .devcontainer/
+dataset_apical4_none/
+vivit_apical4_none_pretrained_modular_dockerized/
+vivit_apical4_none_pretrained_modular_dockerized_2/
+wandb/
+__pycache__/
