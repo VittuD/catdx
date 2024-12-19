@@ -4,11 +4,12 @@ datasets
 decord
 evaluate
 matplotlib
-opencv-python
+opencv-python-headless
 openpyxl
 pydicom
 seaborn
 torch
+torcheval
 torchvision
 transformers
 wandb

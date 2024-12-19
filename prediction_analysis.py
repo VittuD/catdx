@@ -2,6 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import torch
+from utils import compute_r2, compute_mae
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -16,18 +18,24 @@ def compute_statistics(predictions):
     mean_predicted = predictions['predicted'].mean()
     std_predicted = predictions['predicted'].std()
     correlation = predictions['actual'].corr(predictions['predicted'])
+    predicted_tensor = torch.tensor(predictions['predicted'].values).cuda()
+    actual_tensor = torch.tensor(predictions['actual'].values).cuda()
+    r2 = compute_r2(predicted_tensor, actual_tensor)
+    mae = compute_mae(predicted_tensor, actual_tensor)
 
-    return mean_actual, std_actual, mean_predicted, std_predicted, correlation
+    return mean_actual, std_actual, mean_predicted, std_predicted, correlation, r2, mae
 
 # Function to save the computed statistics to a text file
 def save_statistics(stats, stats_file):
-    mean_actual, std_actual, mean_predicted, std_predicted, correlation = stats
+    mean_actual, std_actual, mean_predicted, std_predicted, correlation, r2, mae = stats
     with open(stats_file, 'w') as f:
         f.write(f'Mean (Actual): {mean_actual}\n')
         f.write(f'Std (Actual): {std_actual}\n')
         f.write(f'Mean (Predicted): {mean_predicted}\n')
         f.write(f'Std (Predicted): {std_predicted}\n')
         f.write(f'Correlation: {correlation}\n')
+        f.write(f'R2 Score: {r2}\n')
+        f.write(f'Mean Absolute Error: {mae}\n')
 
 # Function to plot and save the scatter plot and linear fit to a PDF
 def plot_actual_vs_predicted(predictions, pdf_file, stats_text):

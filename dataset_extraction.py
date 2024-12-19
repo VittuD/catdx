@@ -5,7 +5,7 @@ import os
 import torch
 
 apical4_path = 'data/apical4'
-annotations_path = 'catdx/easy/existingLabel.xlsx'
+annotations_path = 'data/existingLabel.xlsx'
 
 # Load annotations
 annotations = pd.read_excel(annotations_path)
@@ -37,18 +37,18 @@ def convert_pt_to_mp4(pt_path, pt_filename, output_filename, fps=30):
     print('Video saved as ', output_filename)
 
 # For each file present in the apical4_none folder, convert it to mp4 and store it in dataset_apical4_none folder
-for file in os.listdir('catdx/easy/apical4'):
+for file in os.listdir('data/apical4'):
     if file.endswith('.pt'):
         output_filename = f'dataset_apical4_none/{file[:-3]}.mp4'
         if not os.path.exists(output_filename):
-            convert_pt_to_mp4('catdx/easy/apical4', file, output_filename)
+            convert_pt_to_mp4('data/apical4', file, output_filename)
 
 # Create the train and validation folders
 os.makedirs('dataset_apical4_none/train', exist_ok=True)
 os.makedirs('dataset_apical4_none/val', exist_ok=True)
 
 # Read the train and test files from the txt file
-partition_file = '/workspaces/catdx/catdx/train_test_split.txt'
+partition_file = 'data/train_test_split.txt'
 with open(partition_file, 'r') as f:
     lines = f.read().splitlines()
 

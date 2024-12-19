@@ -1,8 +1,11 @@
 import json
 import datasets
 import torch
+from torcheval.metrics import R2Score
 import numpy as np
 from transformers import VivitImageProcessor
+from scipy.stats import pearsonr
+
 
 # Load configuration from a JSON file
 def load_config(config_path="config.json"):
@@ -50,23 +53,30 @@ def compute_std(predictions, labels):
 def compute_mse(predictions, labels):
     return torch.mean((predictions - labels) ** 2).item()
 
-def compute_pearson_r2(predictions, labels):
-    mean_predictions = torch.mean(predictions)
-    mean_labels = torch.mean(labels)
-    covariance = torch.mean((predictions - mean_predictions) * (labels - mean_labels))
-    variance_predictions = torch.mean((predictions - mean_predictions) ** 2)
-    variance_labels = torch.mean((labels - mean_labels) ** 2)
-    if variance_predictions == 0 or variance_labels == 0:
-        return float('nan')
-    return (covariance / (torch.sqrt(variance_predictions * variance_labels))) ** 2
+def compute_r2(predictions, labels):
+    metric = R2Score()
+    metric.to("cuda")
+    if predictions.dim() == 2 and predictions.size(1) == 1:  # Shitty workaround
+        predictions = predictions.squeeze(1)
+    metric.update(predictions, labels)
+    return metric.compute().item()
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     predictions = torch.tensor(predictions) if isinstance(predictions, np.ndarray) else predictions
     labels = torch.tensor(labels) if isinstance(labels, np.ndarray) else labels
+    
+    # Compute Pearson correlation using torch.corrcoef
+    pearson_corr = torch.corrcoef(torch.stack((predictions.flatten(), labels.flatten())))[0, 1].item()
+
     return {
         "mae": compute_mae(predictions, labels),
         "std": compute_std(predictions, labels),
         "mse": compute_mse(predictions, labels),
-        "pearson_r2": compute_pearson_r2(predictions, labels),
+        "r2": compute_r2(predictions, labels),
+        "pearson": float(pearson_corr),
     }
+
+# Overwrite 'eval' to 'val' in logs
+# def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="val"):
+#        return super().evaluate(self, eval_dataset=eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)

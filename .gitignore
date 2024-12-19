@@ -1,12 +1,11 @@
 .secrets
 .vscode/
-.vivit_apical4_none_pretrained_modular_dockerized/
 dataset_apical4_none/
 catdx/
+data/
 catdx
 .devcontainer/
 dataset_apical4_none/
-vivit_apical4_none_pretrained_modular_dockerized/
-vivit_apical4_none_pretrained_modular_dockerized_2/
+models/
 wandb/
 __pycache__/

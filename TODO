@@ -1,4 +1,10 @@
-- weight aumentato a 0.1
-- freezare encoder (tranfer learning: adderstrare solo il layer lineare)
-- Debiasing di cole : class ageEstimatorAdjustedCole (https://pmc.ncbi.nlm.nih.gov/articles/PMC7049655/)
-- aumentare image size a 420
+CORRELAZIONE IN TRAIN E VAL
+
+X weight aumentato a 0.1
+X aumentare image size a 420
+X freezare encoder (tranfer learning: adderstrare solo il layer lineare)
+~ Debiasing di cole : class ageEstimatorAdjustedCole (https://pmc.ncbi.nlm.nih.gov/articles/PMC7049655/)
+- Implementare early stopping callback
+
+§ NOTA: apical4_none_420p_amp e successivi sono allenati per più epoche di quanto necessario -> overfitting atroce -> utilizzare i checkpoint di mezzo per validazione ed esperimenti
+§ NOTA: 420p_amp_wd checkpoint 611 ha adjusted cole plots ed è il miglior risultato ottenuto

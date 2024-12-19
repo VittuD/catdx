@@ -10,6 +10,11 @@ def get_training_args(config):
         per_device_eval_batch_size=config["per_device_eval_batch_size"],
         num_train_epochs=config["num_train_epochs"],
         weight_decay=config["weight_decay"],
+        logging_first_step= config["logging_first_step"],
+        logging_strategy= config["save_strategy"],
+        save_strategy= config["save_strategy"],
+        eval_strategy= config["eval_strategy"],
+        fp16=config["fp16"],
         seed=42,
     )
 
@@ -20,4 +25,5 @@ def get_vivit_config(num_frames, resize_to, config, model_name):
     vivit_config.problem_type = 'regression'
     vivit_config.video_size = [num_frames, resize_to, resize_to]
     vivit_config.image_size = resize_to
+    vivit_config.tubelet_size=eval(config["tubelet_size"])
     return vivit_config
