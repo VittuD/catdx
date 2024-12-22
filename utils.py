@@ -42,7 +42,6 @@ def collate_fn(examples, image_processor):
     labels = torch.tensor([example["labels"] for example in examples])
     return {"pixel_values": pixel_values, "labels": labels}
 
-
 # Metric Computation Utilities
 def compute_mae(predictions, labels):
     return torch.mean(torch.abs(predictions - labels)).item()

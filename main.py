@@ -38,7 +38,8 @@ def main():
 
     # Load configuration and model
     num_frames = 32
-    model_name = 'google/vivit-b-16x2-kinetics400'
+    #model_name = 'google/vivit-b-16x2-kinetics400'
+    model_name = 'google/vivit-b-16x2'
     vivit_config = get_vivit_config(num_frames, config['resize_to'], config, model_name)
     model = load_model(vivit_config, model_name)
     

@@ -2,6 +2,7 @@ from transformers import Trainer
 from utils import compute_r2, compute_mae, compute_std, compute_mse
 from scipy.stats import pearsonr
 import torch
+from contrastive import gaussian_contrastive_loss
 
 class LogTrainer(Trainer):
     def __init__(self, *args, **kwargs):
@@ -24,13 +25,24 @@ class LogTrainer(Trainer):
                 self.epoch_wise_labels = torch.tensor([])
         super().log(logs)
 
-    def compute_loss(self, model, inputs, num_items_in_batch=1, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
+
+        # Use projection head's output if available
+        if hasattr(model, "projection_head") and model.projection_head is not None:
+            features = model.projection_head(outputs.last_hidden_state.mean(dim=1))
+        else:
+            features = outputs.last_hidden_state.mean(dim=1)  # Default to mean pooling
+
+        # Compute Gaussian contrastive loss
+        loss = gaussian_contrastive_loss(features, labels, temperature=0.1, sigma=2.0, method='exp')
+
+        # Log predictions and labels for r2 calculation
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs.logits.squeeze())
-        loss = torch.nn.functional.mse_loss(predictions, labels)
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
         self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
+
         return (loss, outputs) if return_outputs else loss
 
     # Overriding the evaluate method to rename the metric to val instead of eval
