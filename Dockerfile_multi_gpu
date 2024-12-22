@@ -1,6 +1,9 @@
 # Base NVIDIA CUDA image with PyTorch and Python pre-installed
 FROM eidos-service.di.unito.it/eidos-base-pytorch:2.5.1
 
+# Add git
+RUN apt-get update && apt-get install -y git
+
 # Copy only the requirements.txt file to the container
 COPY requirements.txt /workspace/requirements.txt
 
