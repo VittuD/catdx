@@ -25,35 +25,30 @@ class LogTrainer(Trainer):
                 self.epoch_wise_labels = torch.tensor([])
         super().log(logs)
 
+    def mse_loss(self, model, outputs, labels, num_items_in_batch=1, return_outputs=False):
+        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs.logits.squeeze())
+        loss = torch.nn.functional.mse_loss(predictions, labels)
+        self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
+        self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
+        return (loss, outputs) if return_outputs else loss
+
     def compute_loss(self, model, inputs, num_items_in_batch, return_outputs=False):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
 
-        # Use projection head's output if available
-        # TODO modify this accordingly to the model's forward method
-        if hasattr(model, "projection_head") and model.projection_head is not None:
-            features = model.projection_head(outputs.last_hidden_state.mean(dim=1))
-        else:
-            features = outputs.last_hidden_state.mean(dim=1)  # Default to mean pooling
+        # Extract features from the model's output
+        features = outputs['projections'] if 'projections' in outputs else None
 
-        # Compute Gaussian contrastive loss
-        loss = gaussian_contrastive_loss(features, labels, temperature=0.1, sigma=2.0, method='exp')
+        # If features is None, use the mse loss else use the gaussian contrastive loss
+        if features is None:
+            loss = self.mse_loss(model, outputs, labels, num_items_in_batch, return_outputs)
+        else:
+            loss = gaussian_contrastive_loss(features, labels, temperature=0.1, sigma=2.0, method='exp')
 
         # Log predictions and labels for r2 calculation
-        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs.logits.squeeze())
-        
-        # Handle non-1 num_items_in_batch
-        if num_items_in_batch > 1:
-            predictions = predictions.view(-1, num_items_in_batch).mean(dim=1)
-            labels = labels.view(-1, num_items_in_batch).mean(dim=1)
+        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs['logits'].squeeze())
         
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
         self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
 
         return (loss, outputs) if return_outputs else loss
-
-    # Overriding the evaluate method to rename the metric to val instead of eval
-    # def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="val"):
-    #     super().evaluate(eval_dataset=eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)
-    # TODO This uploads "train/val_..." metrics to wandb, but we want to upload "val/..." metrics
-    # Maybe tied to how wandb interprets the metric_key_prefix

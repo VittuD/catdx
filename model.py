@@ -1,12 +1,12 @@
-from transformers import VivitForVideoClassification
+from transformers import VivitForVideoClassification, PreTrainedModel
 import torch.nn as nn
 
-class VivitWithOptionalProjectionHead(nn.Module):
+class VivitWithOptionalProjectionHead(PreTrainedModel):
     """
     Wrapper class for Vivit model with a custom projection head.
     """
     def __init__(self, model_name, config, projection_dim=128, add_projection_head=True):
-        super().__init__()
+        super().__init__(config)
         # Load the base ViViT model
         self.vivit = VivitForVideoClassification.from_pretrained(
             pretrained_model_name_or_path=model_name, 
@@ -25,6 +25,10 @@ class VivitWithOptionalProjectionHead(nn.Module):
         else:
             self.projection_head = None
     
+
+        # hidden states -> | projection head | -> regression head -> logits
+
+
     def forward(self, pixel_values, **kwargs):
         # Forward pass through the base model
         outputs = self.vivit(pixel_values=pixel_values, output_hidden_states=True, **kwargs)
@@ -43,9 +47,8 @@ class VivitWithOptionalProjectionHead(nn.Module):
             pooled_output = last_hidden_state.mean(dim=1)  # Shape: (batch_size, hidden_size)
             projections = self.projection_head(pooled_output)  # Shape: (batch_size, projection_dim)
 
-        print(projections.shape)
         # Return both logits and projections
-        return {"logits": outputs.logits, "projections": projections}
+        return {"logits": outputs.logits, "projections": projections, "hidden_states": hidden_states}
 
 def load_model(config, model_name, projection_dim=128, add_projection_head=True):
     """
@@ -68,8 +71,15 @@ def load_model(config, model_name, projection_dim=128, add_projection_head=True)
         freeze_backbone(model.vivit)
         print("Backbone frozen.")
 
-    return model
+    if hasattr(config, "freeze_projection_head") and config.freeze_projection_head:
+        freeze_element(model, "projection_head")
+        print("Projection head frozen.")
 
+    if hasattr(config, "freeze_classifier") and config.freeze_classifier:
+        freeze_element(model, "classifier")
+        print("Classifier frozen.")
+
+    return model
 
 def freeze_backbone(model):
     """
@@ -79,8 +89,23 @@ def freeze_backbone(model):
         model: The model to freeze.
     """
     for name, param in model.named_parameters():
+        ## TODO freeze the regression head when doing contrastive pretraining
         # Freeze everything that isn't part of the classifier or projection head
         if "classifier" not in name and "projection_head" not in name:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+
+def freeze_element(model, element):
+    """
+    Freeze a specific element of the model.
+
+    Args:
+        model: The model to freeze.
+        element: The element to freeze.
+    """
+    for name, param in model.named_parameters():
+        if element in name:
             param.requires_grad = False
         else:
             param.requires_grad = True

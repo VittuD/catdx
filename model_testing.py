@@ -37,7 +37,7 @@ def perform_inference(dataset, model, image_processor, splits):
             with torch.no_grad():
                 pixel_values = pixel_values.to('cuda')
                 outputs = model(pixel_values)
-                prediction = outputs.logits.squeeze().item()  # For regression, logits will contain the output value
+                prediction = outputs['logits'].squeeze().item()  # For regression, logits will contain the output value
 
             # Get the actual label and append the result
             actual_label = example['labels']

@@ -16,7 +16,7 @@ def main():
     dataset = load_dataset(config["dataset_folder"])
     image_processor = get_image_processor(config["resize_to"])
 
-    model_name = "apical4_none_420p_amp_wd_lr/checkpoint-1014"
+    model_name = "apical4_none_112p_projection/checkpoint-260"
     model = VivitForVideoClassification.from_pretrained(
         pretrained_model_name_or_path=model_name
     )
