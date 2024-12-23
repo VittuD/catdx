@@ -25,11 +25,12 @@ class LogTrainer(Trainer):
                 self.epoch_wise_labels = torch.tensor([])
         super().log(logs)
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, num_items_in_batch, return_outputs=False):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
 
         # Use projection head's output if available
+        # TODO modify this accordingly to the model's forward method
         if hasattr(model, "projection_head") and model.projection_head is not None:
             features = model.projection_head(outputs.last_hidden_state.mean(dim=1))
         else:
@@ -40,6 +41,12 @@ class LogTrainer(Trainer):
 
         # Log predictions and labels for r2 calculation
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs.logits.squeeze())
+        
+        # Handle non-1 num_items_in_batch
+        if num_items_in_batch > 1:
+            predictions = predictions.view(-1, num_items_in_batch).mean(dim=1)
+            labels = labels.view(-1, num_items_in_batch).mean(dim=1)
+        
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
         self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
 

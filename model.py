@@ -3,10 +3,11 @@ import torch.nn as nn
 
 class VivitWithOptionalProjectionHead(nn.Module):
     """
-    Wrapper class for Vivit model with an optional projection head.
+    Wrapper class for Vivit model with a custom projection head.
     """
     def __init__(self, model_name, config, projection_dim=128, add_projection_head=True):
         super().__init__()
+        # Load the base ViViT model
         self.vivit = VivitForVideoClassification.from_pretrained(
             pretrained_model_name_or_path=model_name, 
             config=config,
@@ -14,28 +15,37 @@ class VivitWithOptionalProjectionHead(nn.Module):
         )
         self.add_projection_head = add_projection_head
 
-        # Add a projection head if required
+        # Add projection head if specified
         if self.add_projection_head:
             self.projection_head = nn.Sequential(
-                nn.Linear(self.vivit.config.hidden_size, self.vivit.config.hidden_size),
+                nn.Linear(config.hidden_size, config.hidden_size),
                 nn.ReLU(),
-                nn.Linear(self.vivit.config.hidden_size, projection_dim)
+                nn.Linear(config.hidden_size, projection_dim)
             )
         else:
             self.projection_head = None
     
     def forward(self, pixel_values, **kwargs):
-        # Get outputs from the base model
-        outputs = self.vivit(pixel_values=pixel_values, **kwargs)
-        pooled_output = outputs.logits  # Assuming the logits are the pooled output
+        # Forward pass through the base model
+        outputs = self.vivit(pixel_values=pixel_values, output_hidden_states=True, **kwargs)
+        
+        # Extract hidden states
+        hidden_states = outputs.hidden_states  # List of hidden states from all transformer layers
 
-        # Compute projections if the projection head exists
+        # Optionally get the last hidden state
+        last_hidden_state = hidden_states[-1]  # Shape: (batch_size, seq_len, hidden_size)
+
+        # Apply projection head if specified
         projections = None
+
         if self.add_projection_head and self.projection_head is not None:
-            projections = self.projection_head(pooled_output)
+            # Optionally pool the sequence embeddings (mean pooling or [CLS] token)
+            pooled_output = last_hidden_state.mean(dim=1)  # Shape: (batch_size, hidden_size)
+            projections = self.projection_head(pooled_output)  # Shape: (batch_size, projection_dim)
 
-        return projections, outputs.logits  # Return projections (if any) and original logits
-
+        print(projections.shape)
+        # Return both logits and projections
+        return {"logits": outputs.logits, "projections": projections}
 
 def load_model(config, model_name, projection_dim=128, add_projection_head=True):
     """

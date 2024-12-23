@@ -1,4 +1,4 @@
-from utils import load_config, load_dataset, get_image_processor, collate_fn, compute_metrics
+from utils import load_config, load_dataset, get_image_processor, collate_fn, compute_metrics, preprocess_example
 from model import load_model
 from config import get_training_args, get_vivit_config
 from trainer import LogTrainer
@@ -49,13 +49,20 @@ def main():
     # Training arguments
     training_args = get_training_args(config)
 
+    # Dummy debug function to inspect the datacollator
+    # def debug_data_collator(examples):
+    #     print(examples)
+    #     pixel_values = collate_fn(examples, image_processor)
+    #     labels = torch.tensor([example['labels'] for example in examples])
+    #     return {'pixel_values': pixel_values, 'labels': labels}
+
     # Create Trainer
     trainer = LogTrainer(
         model=model,
         args=training_args,
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
-        data_collator=lambda examples: collate_fn(examples, image_processor),
+        data_collator = lambda examples: collate_fn(examples, image_processor),
         compute_metrics=compute_metrics,
     )
 

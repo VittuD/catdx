@@ -12,12 +12,25 @@ def load_config(config_path="config.json"):
     with open(config_path, "r") as f:
         return json.load(f)
 
+def get_image_processor(resize_to):
+    return VivitImageProcessor(
+        do_resize=True,
+        size={'height': resize_to, 'width': resize_to},
+        do_center_crop=False,
+        do_normalize=True,
+    )
+
 # Dataset Utilities
 def load_dataset(dataset_folder):
     dataset = datasets.load_dataset(dataset_folder)
     dataset = dataset.rename_column('video', 'pixel_values')
     dataset = dataset.rename_column('CO', 'labels')
     return dataset
+
+def collate_fn(examples, image_processor):
+    pixel_values = torch.stack([preprocess_example(example, image_processor).squeeze(0) for example in examples])
+    labels = torch.tensor([example["labels"] for example in examples])
+    return {"pixel_values": pixel_values, "labels": labels}
 
 def preprocess_example(example, image_processor, num_frames=32):
     video = example['pixel_values']
@@ -28,19 +41,6 @@ def preprocess_example(example, image_processor, num_frames=32):
         frames = frames[:num_frames]
     processed_video = image_processor(frames, return_tensors='pt')
     return processed_video['pixel_values']
-
-def get_image_processor(resize_to):
-    return VivitImageProcessor(
-        do_resize=True,
-        size={'height': resize_to, 'width': resize_to},
-        do_center_crop=False,
-        do_normalize=True,
-    )
-
-def collate_fn(examples, image_processor):
-    pixel_values = torch.stack([preprocess_example(example, image_processor).squeeze(0) for example in examples])
-    labels = torch.tensor([example["labels"] for example in examples])
-    return {"pixel_values": pixel_values, "labels": labels}
 
 # Metric Computation Utilities
 def compute_mae(predictions, labels):

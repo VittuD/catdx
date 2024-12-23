@@ -15,6 +15,7 @@ def get_training_args(config):
         save_strategy= config["save_strategy"],
         eval_strategy= config["eval_strategy"],
         fp16=config["fp16"],
+        remove_unused_columns = False,
         seed=42,
     )
 
