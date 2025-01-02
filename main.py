@@ -48,14 +48,7 @@ def main():
 
     # Training arguments
     training_args = get_training_args(config)
-
-    # Dummy debug function to inspect the datacollator
-    # def debug_data_collator(examples):
-    #     print(examples)
-    #     pixel_values = collate_fn(examples, image_processor)
-    #     labels = torch.tensor([example['labels'] for example in examples])
-    #     return {'pixel_values': pixel_values, 'labels': labels}
-
+    
     # Create Trainer
     trainer = LogTrainer(
         model=model,
@@ -73,7 +66,7 @@ def main():
     model.save_pretrained(config['run_name'])
 
     # Run inference and save results
-    results = run_inference_and_save(dataset=dataset, model=model, trainer=trainer, output_dir=config['run_name'], image_processor=image_processor)
+    results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=config['run_name'])
     
     # Generate predictions report
     for result in results:

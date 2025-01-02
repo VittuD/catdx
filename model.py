@@ -26,7 +26,7 @@ class VivitWithOptionalProjectionHead(PreTrainedModel):
             self.projection_head = None
     
 
-        # hidden states -> | projection head | -> regression head -> logits
+    ### hidden states -> | projection head | -> regression head -> logits
 
 
     def forward(self, pixel_values, **kwargs):

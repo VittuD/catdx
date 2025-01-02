@@ -25,14 +25,14 @@ class LogTrainer(Trainer):
                 self.epoch_wise_labels = torch.tensor([])
         super().log(logs)
 
-    def mse_loss(self, model, outputs, labels, num_items_in_batch=1, return_outputs=False):
+    def mse_loss(self, model, outputs, labels, num_items_in_batch=1):
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs.logits.squeeze())
         loss = torch.nn.functional.mse_loss(predictions, labels)
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
         self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
-        return (loss, outputs) if return_outputs else loss
+        return loss
 
-    def compute_loss(self, model, inputs, num_items_in_batch, return_outputs=False):
+    def compute_loss(self, model, inputs, num_items_in_batch=1, return_outputs=False):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
 
@@ -41,7 +41,7 @@ class LogTrainer(Trainer):
 
         # If features is None, use the mse loss else use the gaussian contrastive loss
         if features is None:
-            loss = self.mse_loss(model, outputs, labels, num_items_in_batch, return_outputs)
+            loss = self.mse_loss(model, outputs, labels, num_items_in_batch)
         else:
             loss = gaussian_contrastive_loss(features, labels, temperature=0.1, sigma=2.0, method='exp')
 
