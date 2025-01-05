@@ -1,16 +1,8 @@
-import json
 import datasets
 import torch
 from torcheval.metrics import R2Score
 import numpy as np
 from transformers import VivitImageProcessor
-from scipy.stats import pearsonr
-
-
-# Load configuration from a JSON file
-def load_config(config_path="config.json"):
-    with open(config_path, "r") as f:
-        return json.load(f)
 
 def get_image_processor(resize_to):
     return VivitImageProcessor(
@@ -76,6 +68,6 @@ def compute_metrics(eval_pred):
         "pearson": float(pearson_corr),
     }
 
-# Overwrite 'eval' to 'val' in logs
+# Overwrite 'eval' to 'val' in logs (still fails but it's no priority)
 # def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="val"):
 #        return super().evaluate(self, eval_dataset=eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)

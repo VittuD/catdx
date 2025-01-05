@@ -1,6 +1,10 @@
 from transformers import VivitForVideoClassification, PreTrainedModel
 import torch.nn as nn
 
+
+## TODO freeze the regression head when doing contrastive pretraining
+
+
 class VivitWithOptionalProjectionHead(PreTrainedModel):
     """
     Wrapper class for Vivit model with a custom projection head.
@@ -50,7 +54,7 @@ class VivitWithOptionalProjectionHead(PreTrainedModel):
         # Return both logits and projections
         return {"logits": outputs.logits, "projections": projections, "hidden_states": hidden_states}
 
-def load_model(config, model_name, projection_dim=128, add_projection_head=True):
+def load_model(vivit_config, model_name, projection_dim=128, add_projection_head=True):
     """
     Load the Vivit model with an optional projection head.
 
@@ -64,20 +68,12 @@ def load_model(config, model_name, projection_dim=128, add_projection_head=True)
         model: An instance of VivitWithOptionalProjectionHead.
     """
     model = VivitWithOptionalProjectionHead(
-        model_name, config, projection_dim, add_projection_head
+        model_name, vivit_config, projection_dim, add_projection_head
     )
-
-    if hasattr(config, "freeze_backbone") and config.freeze_backbone:
-        freeze_backbone(model.vivit)
-        print("Backbone frozen.")
-
-    if hasattr(config, "freeze_projection_head") and config.freeze_projection_head:
-        freeze_element(model, "projection_head")
-        print("Projection head frozen.")
-
-    if hasattr(config, "freeze_classifier") and config.freeze_classifier:
-        freeze_element(model, "classifier")
-        print("Classifier frozen.")
+    if hasattr(vivit_config, "freeze") and isinstance(vivit_config.freeze, list):
+        print(f"Freezing: {vivit_config.freeze}")
+        for element in vivit_config.freeze:
+            freeze_element(model, element)
 
     return model
 
@@ -89,12 +85,9 @@ def freeze_backbone(model):
         model: The model to freeze.
     """
     for name, param in model.named_parameters():
-        ## TODO freeze the regression head when doing contrastive pretraining
         # Freeze everything that isn't part of the classifier or projection head
         if "classifier" not in name and "projection_head" not in name:
             param.requires_grad = False
-        else:
-            param.requires_grad = True
 
 def freeze_element(model, element):
     """
@@ -105,7 +98,8 @@ def freeze_element(model, element):
         element: The element to freeze.
     """
     for name, param in model.named_parameters():
-        if element in name:
-            param.requires_grad = False
+        if element == "backbone":
+            freeze_backbone(model)
         else:
-            param.requires_grad = True
+            if element in name:
+                param.requires_grad = False
