@@ -19,13 +19,16 @@ class VivitWithOptionalProjectionHead(PreTrainedModel):
         )
         self.add_projection_head = add_projection_head
 
-        # Add projection head if specified
+        # Add projection head if specified and not already present
         if self.add_projection_head:
-            self.projection_head = nn.Sequential(
-                nn.Linear(config.hidden_size, config.hidden_size),
-                nn.ReLU(),
-                nn.Linear(config.hidden_size, projection_dim)
-            )
+            if not hasattr(self.vivit, 'projection_head'):
+                self.projection_head = nn.Sequential(
+                    nn.Linear(config.hidden_size, config.hidden_size),
+                    nn.ReLU(),
+                    nn.Linear(config.hidden_size, projection_dim)
+                )
+            else:
+                self.projection_head = self.vivit.projection_head
         else:
             self.projection_head = None
     
@@ -70,24 +73,22 @@ def load_model(vivit_config, model_name, projection_dim=128, add_projection_head
     model = VivitWithOptionalProjectionHead(
         model_name, vivit_config, projection_dim, add_projection_head
     )
+
+    # For contrastive pretraining, freeze the classifier head automatically
+    if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "contrastive":
+        freeze_element(model, "classifier")
+
+    # For regression training, freeze the backbone and projection head
+    if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "regression":
+        freeze_element(model, "backbone")
+        freeze_element(model, "projection_head")
+
     if hasattr(vivit_config, "freeze") and isinstance(vivit_config.freeze, list):
         print(f"Freezing: {vivit_config.freeze}")
         for element in vivit_config.freeze:
             freeze_element(model, element)
 
     return model
-
-def freeze_backbone(model):
-    """
-    Freeze the backbone of the model.
-
-    Args:
-        model: The model to freeze.
-    """
-    for name, param in model.named_parameters():
-        # Freeze everything that isn't part of the classifier or projection head
-        if "classifier" not in name and "projection_head" not in name:
-            param.requires_grad = False
 
 def freeze_element(model, element):
     """
@@ -103,3 +104,15 @@ def freeze_element(model, element):
         else:
             if element in name:
                 param.requires_grad = False
+
+def freeze_backbone(model):
+    """
+    Freeze the backbone of the model.
+
+    Args:
+        model: The model to freeze.
+    """
+    for name, param in model.named_parameters():
+        # Freeze everything that isn't part of the classifier or projection head
+        if "classifier" not in name and "projection_head" not in name:
+            param.requires_grad = False
