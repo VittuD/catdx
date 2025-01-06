@@ -1,8 +1,5 @@
-import torch
 import pandas as pd
 import os
-from tqdm import tqdm
-from utils import preprocess_example
 
 # Function to perform inference and collect predictions for each partition
 def perform_inference(dataset, splits, trainer):
@@ -21,7 +18,7 @@ def perform_inference(dataset, splits, trainer):
         # Use the trainer predict method to get predictions on the split
         predictions = trainer.predict(dataset[split])
         actual_labels = predictions.label_ids
-        predicted_labels = predictions.predictions
+        predicted_labels = predictions.predictions[0] if isinstance(predictions.predictions, tuple) else predictions.predictions
 
         # Iterate over the predictions and actual labels
         for prediction, actual_label in zip(predicted_labels, actual_labels):
