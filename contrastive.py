@@ -1,67 +1,65 @@
-import torch
-import torch.nn.functional as F
+# contrastive.py
+
 import math
 import torch
+from losses import KernelizedSupCon
 
-
-# Gaussian kernel function
-def gaussian_kernel(x, sigma):
-        x = x - x.T
-        return torch.exp(-(x**2) / (2*(sigma**2))) / (math.sqrt(2*torch.pi)*sigma)
-
-# Gaussian contrastive loss function
-def gaussian_contrastive_loss(features, labels, temperature=0.07, sigma=1.0, method='exp'):
+def gaussian_kernel(labels, sigma: float = 1.0):
     """
-    Compute contrastive loss with a Gaussian kernel.
+    Compute a Gaussian kernel on the 1D labels. 
+    labels: shape [batch_size, 1] or [batch_size].
+    returns: [batch_size, batch_size] matrix of Gaussian weights.
+    """
+    labels = labels.float().view(-1, 1)  # ensure [bsz, 1]
+    diff = labels - labels.T  # shape [bsz, bsz]
+    # Gaussian kernel
+    return torch.exp(- (diff ** 2) / (2.0 * (sigma ** 2))) / (math.sqrt(2.0 * math.pi) * sigma)
+
+def kernelized_supcon_loss(
+    features: torch.Tensor,
+    labels: torch.Tensor,
+    temperature: float = 0.07,
+    sigma: float = 1.0,
+    method: str = 'expw',
+    contrast_mode: str = 'all',
+    base_temperature: float = 0.07,
+    delta_reduction: str = 'sum',
+):
+    """
+    A wrapper to instantiate and call KernelizedSupCon with a Gaussian kernel
+    for method != 'supcon'. If method='supcon', no kernel is used.
 
     Args:
-        features (torch.Tensor): Feature embeddings with shape [batch_size, feature_dim].
-        labels (torch.Tensor): Labels with shape [batch_size].
-        temperature (float): Temperature scaling for similarity.
-        sigma (float): Standard deviation for Gaussian kernel.
-        method (str): Loss method ('y-aware' or 'exp').
+        features (torch.Tensor): shape [batch_size, n_views, n_features]
+        labels (torch.Tensor): shape [batch_size]
+        temperature (float): temperature scaling
+        sigma (float): standard deviation for the Gaussian kernel
+        method (str): 'supcon', 'threshold', 'expw', etc.
+        contrast_mode (str): 'all' or 'one'
+        base_temperature (float): base temperature (usually same as temperature)
+        delta_reduction (str): 'mean' or 'sum', used in threshold method
     Returns:
-        torch.Tensor: The contrastive loss.
+        torch.Tensor: contrastive loss scalar
     """
-    device = features.device
-    batch_size = features.size(0)
 
-    # Normalize features
-    features = F.normalize(features, dim=1)
-
-    # Compute similarity matrix
-    similarity_matrix = torch.matmul(features, features.T) / temperature
-
-    # Gaussian kernel applied to labels
-    kernel_matrix = gaussian_kernel(labels, sigma)
-
-    # Positive mask
-    positive_mask = kernel_matrix.clone()
-
-    # Apply y-aware or Lexp formulations
-    if method == 'y-aware':
-        # y-aware: Normalize kernel weights
-        kernel_sum = kernel_matrix.sum(dim=1, keepdim=True)
-        normalized_kernel = kernel_matrix / kernel_sum
-
-        # Log-sum-exp formulation
-        log_prob = similarity_matrix - torch.logsumexp(similarity_matrix, dim=1, keepdim=True)
-        log_prob = normalized_kernel * log_prob
-
-    elif method == 'exp':
-        # Lexp: Adjust weights inversely proportional to kernel distance
-        adjusted_weights = 1 - kernel_matrix
-        log_prob = similarity_matrix - torch.logsumexp(similarity_matrix * adjusted_weights, dim=1, keepdim=True)
-        log_prob = kernel_matrix * log_prob
-
+    if method == 'supcon':
+        # For plain supcon, kernel must be None
+        kernel = None
     else:
-        raise ValueError(f"Invalid method: {method}. Choose 'y-aware' or 'exp'.")
+        # For other methods, define the kernel function
+        def kernel_fn(labels):
+            return gaussian_kernel(labels, sigma=sigma)
+        kernel = kernel_fn
 
-    # Avoid self-contrast
-    mask = torch.eye(batch_size, device=device)
-    positive_mask = positive_mask * (1 - mask)
+    # Create the loss function object
+    loss_fn = KernelizedSupCon(
+        method=method,
+        temperature=temperature,
+        contrast_mode=contrast_mode,
+        base_temperature=base_temperature,
+        kernel=kernel,
+        delta_reduction=delta_reduction,
+    )
 
-    # Compute mean loss
-    loss = -torch.sum(log_prob) / torch.sum(positive_mask)
-
-    return loss
+    # Forward pass
+    return loss_fn.forward(features, labels)

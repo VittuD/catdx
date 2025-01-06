@@ -233,3 +233,4 @@ class DiagnosisEstimator(BaseEstimator):
     def confusion_matrix(self, X, y):
         y_pred = self.predict(X)
         return confusion_matrix(y, y_pred)
+    

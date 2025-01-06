@@ -1,6 +1,6 @@
-from utils import load_config, load_dataset, get_image_processor, collate_fn, compute_metrics, preprocess_example
+from utils import load_dataset, get_image_processor, collate_fn, compute_metrics
 from model import load_model
-from config import get_training_args, get_vivit_config
+from config import load_config, get_training_args, get_vivit_config
 from trainer import LogTrainer
 import os
 import wandb
@@ -42,9 +42,6 @@ def main():
     model_name = 'google/vivit-b-16x2'
     vivit_config = get_vivit_config(num_frames, config['resize_to'], config, model_name)
     model = load_model(vivit_config, model_name)
-    
-    # for name, param in model.named_parameters():
-    #     print(name, param.requires_grad)
 
     # Training arguments
     training_args = get_training_args(config)
@@ -57,6 +54,7 @@ def main():
         eval_dataset=dataset['validation'],
         data_collator = lambda examples: collate_fn(examples, image_processor),
         compute_metrics=compute_metrics,
+        training_mode=config['vivit_training_mode'],
     )
 
     # Train the model

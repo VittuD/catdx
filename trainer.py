@@ -1,12 +1,18 @@
+# trainer.py
+
 from transformers import Trainer
 from utils import compute_r2, compute_mae, compute_std, compute_mse
 from scipy.stats import pearsonr
 import torch
-from contrastive import gaussian_contrastive_loss
+
+# Import the new wrapper function
+from contrastive import kernelized_supcon_loss
 
 class LogTrainer(Trainer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, training_mode='regression', *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.label_names+=['labels']
+        self.training_mode = training_mode
         self.epoch_wise_predictions = torch.tensor([])
         self.epoch_wise_labels = torch.tensor([])
 
@@ -26,7 +32,7 @@ class LogTrainer(Trainer):
         super().log(logs)
 
     def mse_loss(self, model, outputs, labels, num_items_in_batch=1):
-        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs.logits.squeeze())
+        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs['logits'].squeeze())
         loss = torch.nn.functional.mse_loss(predictions, labels)
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
         self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
@@ -37,17 +43,27 @@ class LogTrainer(Trainer):
         outputs = model(**inputs)
 
         # Extract features from the model's output
+        # Suppose 'outputs' has 'projections' if we want contrastive
         features = outputs['projections'] if 'projections' in outputs else None
 
-        # If features is None, use the mse loss else use the gaussian contrastive loss
-        if features is None:
+        # If features is None, use MSE loss; else use kernelized_supcon_loss
+        if self.training_mode == 'regression' or features is None:
             loss = self.mse_loss(model, outputs, labels, num_items_in_batch)
         else:
-            loss = gaussian_contrastive_loss(features, labels, temperature=0.1, sigma=2.0, method='exp')
-
+            # Example usage: method='expw' with a bigger sigma
+            loss = kernelized_supcon_loss(
+                features=features.unsqueeze(1),  # Add an extra dimension [bsz, n_views, n_feats]
+                labels=labels, 
+                temperature=0.1, 
+                sigma=2.0, 
+                method='expw',    # or 'threshold' or 'supcon' ...
+                contrast_mode='all',
+                base_temperature=0.1,
+                delta_reduction='sum'
+            )
+            
         # Log predictions and labels for r2 calculation
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs['logits'].squeeze())
-        
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
         self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
 

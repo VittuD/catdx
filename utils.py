@@ -55,6 +55,8 @@ def compute_r2(predictions, labels):
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     predictions = torch.tensor(predictions) if isinstance(predictions, np.ndarray) else predictions
+    # if predictions is a tuple take the first and convert to tensor
+    predictions = torch.tensor(predictions[0]) if isinstance(predictions, tuple) else predictions
     labels = torch.tensor(labels) if isinstance(labels, np.ndarray) else labels
     
     # Compute Pearson correlation using torch.corrcoef
