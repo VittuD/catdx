@@ -31,7 +31,7 @@ class LogTrainer(Trainer):
                 self.epoch_wise_labels = torch.tensor([])
         super().log(logs)
 
-    def mse_loss(self, outputs, labels, num_items_in_batch=1):
+    def mse_loss(self, outputs, labels):
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs['logits'].squeeze())
         loss = torch.nn.functional.mse_loss(predictions, labels)
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
@@ -48,7 +48,7 @@ class LogTrainer(Trainer):
 
         # If features is None, use MSE loss; else use kernelized_supcon_loss
         if self.training_mode == 'regression' or features is None:
-            loss = self.mse_loss(outputs, labels, num_items_in_batch)
+            loss = self.mse_loss(outputs, labels)
         else:
             # Example usage: method='expw' with a bigger sigma
             loss = kernelized_supcon_loss(
