@@ -61,5 +61,8 @@ def kernelized_supcon_loss(
         delta_reduction=delta_reduction,
     )
 
+    # Normalize the features for dot product
+    normalized_features = torch.nn.functional.normalize(features, dim=-1, p=2)
+
     # Forward pass
-    return loss_fn.forward(features, labels)
+    return loss_fn.forward(normalized_features, labels)
