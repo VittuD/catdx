@@ -76,12 +76,19 @@ def load_model(vivit_config, model_name, projection_dim=128, add_projection_head
 
     # For contrastive pretraining, freeze the classifier head automatically
     if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "contrastive":
-        freeze_element(model, "classifier")
+        print(f'Adding classifier head to the Freeze list for contrastive pretraining')
+        # Add classifier to the list of elements to freeze if not already present
+        if "classifier" not in vivit_config.freeze:
+            vivit_config.freeze.append("classifier")
 
     # For regression training, freeze the backbone and projection head
     if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "regression":
-        freeze_element(model, "backbone")
-        freeze_element(model, "projection_head")
+        print(f'Adding backbone and projection head to the Freeze list for regression training')
+        # Add backbone and projection head to the list of elements to freeze if not already present
+        if "backbone" not in vivit_config.freeze:
+            vivit_config.freeze.append("backbone")
+        if "projection_head" not in vivit_config.freeze:
+            vivit_config.freeze.append("projection_head")
 
     if hasattr(vivit_config, "freeze") and isinstance(vivit_config.freeze, list):
         print(f"Freezing: {vivit_config.freeze}")
@@ -98,6 +105,7 @@ def freeze_element(model, element):
         model: The model to freeze.
         element: The element to freeze.
     """
+    print(f"Freezing {element}")
     for name, param in model.named_parameters():
         if element == "backbone":
             freeze_backbone(model)
