@@ -32,7 +32,7 @@ def get_vivit_config(num_frames, resize_to, config, model_name):
     vivit_config.problem_type = 'regression'
     vivit_config.video_size = [num_frames, resize_to, resize_to]
     vivit_config.image_size = resize_to
-    vivit_config.tubelet_size=eval(config.get("tubelet_size", "[2, 16, 16]"))
+    vivit_config.tubelet_size=config.get("tubelet_size", "[2, 16, 16]")
     vivit_config.freeze = config.get("freeze", [])
-    vivit_config.vivit_training_mode = config.get("vivit_training_mode", "regression")
+    vivit_config.vivit_training_mode = config.get("vivit_training_mode", "")
     return vivit_config
