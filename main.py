@@ -1,12 +1,13 @@
 from utils import load_dataset, get_image_processor, collate_fn, compute_metrics
 from model import load_model
-from config import load_config, get_training_args, get_vivit_config
+from config import load_config, get_training_args
 from trainer import LogTrainer
 import os
 import wandb
 from model_testing import run_inference_and_save
 from prediction_analysis import generate_predictions_report
 import torch
+from transformers import VivitConfig
 
 def main():
     # Check if CUDA is available
@@ -40,8 +41,9 @@ def main():
     num_frames = 32
     #model_name = 'google/vivit-b-16x2-kinetics400'
     model_name = 'google/vivit-b-16x2'
-    vivit_config = get_vivit_config(num_frames, config['resize_to'], config, model_name)
-    model = load_model(vivit_config, model_name)
+    # vivit_config = get_vivit_config(num_frames, config['resize_to'], config, model_name)
+    vivit_config = VivitConfig.from_json_file('model_config.json')
+    model = load_model(vivit_config=vivit_config)
 
     # Training arguments
     training_args = get_training_args(config)

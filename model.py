@@ -1,19 +1,22 @@
-from transformers import VivitForVideoClassification, PreTrainedModel
+from transformers import VivitForVideoClassification, VivitConfig
 import torch.nn as nn
 
 
 ## TODO freeze the regression head when doing contrastive pretraining
 
 
-class VivitWithOptionalProjectionHead(PreTrainedModel):
+class VivitWithOptionalProjectionHead(VivitForVideoClassification):
     """
     Wrapper class for Vivit model with a custom projection head.
     """
-    def __init__(self, model_name, config, projection_dim=128, add_projection_head=True):
+    config_class = VivitConfig
+
+    def __init__(self, config: VivitConfig, projection_dim=128, add_projection_head=True):
+        
         super().__init__(config)
         # Load the base ViViT model
         self.vivit = VivitForVideoClassification.from_pretrained(
-            pretrained_model_name_or_path=model_name, 
+            pretrained_model_name_or_path=config.model_name_or_path, 
             config=config,
             ignore_mismatched_sizes=True
         )
@@ -32,6 +35,8 @@ class VivitWithOptionalProjectionHead(PreTrainedModel):
         else:
             self.projection_head = None
     
+    # def __init__(self, config):
+
 
     ### hidden states -> | projection head | -> regression head -> logits
 
@@ -57,7 +62,7 @@ class VivitWithOptionalProjectionHead(PreTrainedModel):
         # Return both logits and projections
         return {"logits": outputs.logits, "projections": projections, "hidden_states": hidden_states}
 
-def load_model(vivit_config, model_name, projection_dim=128, add_projection_head=True):
+def load_model(vivit_config, projection_dim=128, add_projection_head=True):
     """
     Load the Vivit model with an optional projection head.
 
@@ -71,7 +76,7 @@ def load_model(vivit_config, model_name, projection_dim=128, add_projection_head
         model: An instance of VivitWithOptionalProjectionHead.
     """
     model = VivitWithOptionalProjectionHead(
-        model_name, vivit_config, projection_dim, add_projection_head
+        vivit_config, projection_dim, add_projection_head
     )
 
     # For contrastive pretraining, freeze the classifier head automatically

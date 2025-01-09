@@ -1,0 +1,44 @@
+{
+  "architectures": [
+    "VivitWithOptionalProjectionHead"
+  ],
+  "attention_probs_dropout_prob": 0.0,
+  "freeze": [
+    "backbone",
+    "projection_head"
+  ],
+  "hidden_act": "gelu_fast",
+  "hidden_dropout_prob": 0.0,
+  "hidden_size": 768,
+  "id2label": {
+    "0": "LABEL_0"
+  },
+  "image_size": 112,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "label2id": {
+    "LABEL_0": 0
+  },
+  "layer_norm_eps": 1e-06,
+  "model_type": "vivit",
+  "num_attention_heads": 12,
+  "num_channels": 3,
+  "num_frames": 32,
+  "num_hidden_layers": 12,
+  "problem_type": "regression",
+  "qkv_bias": true,
+  "torch_dtype": "float32",
+  "transformers_version": "4.47.1",
+  "tubelet_size": [
+    2,
+    16,
+    16
+  ],
+  "video_size": [
+    32,
+    112,
+    112
+  ],
+  "vivit_training_mode": "regression",
+  "model_name_or_path": "apical4_none_vanilla_regression_debug/checkpoint-51"
+}

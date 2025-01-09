@@ -36,3 +36,20 @@ def get_vivit_config(num_frames, resize_to, config, model_name):
     vivit_config.freeze = config.get("freeze", [])
     vivit_config.vivit_training_mode = config.get("vivit_training_mode", "")
     return vivit_config
+
+def get_vivit_config_from_json(config_json, model_name):
+    #vivit_config = VivitConfig.from_pretrained(model_name)
+    vivit_config = VivitConfig.from_json_file(config_json)
+    return vivit_config
+
+# Main for testing
+def main():
+    # Load configuration
+    config = load_config("config.json")
+    model_config = "model_config.json"
+    model_config = get_vivit_config_from_json(model_config, "google/vivit-b-16x2")
+    print(model_config)
+
+if __name__ == "__main__":
+    main()
+    
