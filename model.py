@@ -62,7 +62,7 @@ class VivitWithOptionalProjectionHead(VivitForVideoClassification):
         # Return both logits and projections
         return {"logits": outputs.logits, "projections": projections, "hidden_states": hidden_states}
 
-def load_model(vivit_config, projection_dim=128, add_projection_head=True):
+def load_model(vivit_config, is_pretrained=False, projection_dim=128, add_projection_head=True):
     """
     Load the Vivit model with an optional projection head.
 
@@ -75,9 +75,16 @@ def load_model(vivit_config, projection_dim=128, add_projection_head=True):
     Returns:
         model: An instance of VivitWithOptionalProjectionHead.
     """
-    model = VivitWithOptionalProjectionHead(
-        vivit_config, projection_dim, add_projection_head
-    )
+    if is_pretrained:
+        model = VivitWithOptionalProjectionHead.from_pretrained(
+            pretrained_model_name_or_path=vivit_config.model_name_or_path,
+            config=vivit_config,
+            ignore_mismatched_sizes=True
+        )
+    else:
+        model = VivitWithOptionalProjectionHead(
+            vivit_config, projection_dim, add_projection_head
+        )
 
     # For contrastive pretraining, freeze the classifier head automatically
     if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "contrastive":
@@ -99,6 +106,10 @@ def load_model(vivit_config, projection_dim=128, add_projection_head=True):
         print(f"Freezing: {vivit_config.freeze}")
         for element in vivit_config.freeze:
             freeze_element(model, element)
+
+    # Debug print each layer with if it requires_grad or not
+    for name, param in model.named_parameters():
+        print(f'{name}: {param.requires_grad}')
 
     return model
 

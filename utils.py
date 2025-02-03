@@ -65,11 +65,11 @@ def compute_metrics(eval_pred):
     pearson_corr = torch.corrcoef(torch.stack((predictions.flatten(), labels.flatten())))[0, 1].item()
 
     return {
-        "mae": compute_mae(predictions, labels),
-        "std": compute_std(predictions, labels),
-        "mse": compute_mse(predictions, labels),
-        "r2": compute_r2(predictions, labels),
-        "pearson": float(pearson_corr),
+        "mae_e": compute_mae(predictions, labels),
+        "std_e": compute_std(predictions, labels),
+        "mse_e": compute_mse(predictions, labels),
+        "r2_e": compute_r2(predictions, labels),
+        "pearson_e": float(pearson_corr),
     }
 
 # Overwrite 'eval' to 'val' in logs (still fails but it's no priority)

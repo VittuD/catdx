@@ -17,16 +17,19 @@ class LogTrainer(Trainer):
         self.epoch_wise_labels = torch.tensor([])
 
     def log(self, logs, start_time='NaN'):
+        ## TODO this computes twice the metrics since 'compute_metrics' is called before 'log'
         logs["learning_rate"] = self._get_learning_rate()
         logs["step"] = self.state.global_step
         # Add train/r2 data leveraging the batch_wise_predictions and batch_wise_labels
         if self.state.is_local_process_zero:
             if self.epoch_wise_predictions.numel() > 0 and self.epoch_wise_labels.numel() > 0:
-                logs["r2"] = compute_r2(self.epoch_wise_predictions, self.epoch_wise_labels)
-                logs["pearson"] = float(pearsonr(self.epoch_wise_predictions, self.epoch_wise_labels)[0])
-                logs["mae"] = compute_mae(self.epoch_wise_predictions, self.epoch_wise_labels)
-                logs["std"] = compute_std(self.epoch_wise_predictions, self.epoch_wise_labels)
-                logs["mse"] = compute_mse(self.epoch_wise_predictions, self.epoch_wise_labels)
+                # If logs has a key with 'eval' in it, set prefix to "eval_"
+                prefix = "eval_" if any('eval' in key for key in logs.keys()) else ""
+                logs[f"{prefix}r2"] = compute_r2(self.epoch_wise_predictions, self.epoch_wise_labels)
+                logs[f"{prefix}pearson"] = float(pearsonr(self.epoch_wise_predictions, self.epoch_wise_labels)[0])
+                logs[f"{prefix}mae"] = compute_mae(self.epoch_wise_predictions, self.epoch_wise_labels)
+                logs[f"{prefix}std"] = compute_std(self.epoch_wise_predictions, self.epoch_wise_labels)
+                logs[f"{prefix}mse"] = compute_mse(self.epoch_wise_predictions, self.epoch_wise_labels)
                 self.epoch_wise_predictions = torch.tensor([])
                 self.epoch_wise_labels = torch.tensor([])
         super().log(logs)
@@ -54,11 +57,11 @@ class LogTrainer(Trainer):
             loss = kernelized_supcon_loss(
                 features=features.unsqueeze(1),  # Add an extra dimension [bsz, n_views, n_feats]
                 labels=labels, 
-                temperature=0.1, 
-                sigma=2.0, 
+                temperature=0.07, 
+                sigma=1.0, 
                 method='expw',    # or 'threshold' or 'supcon' ...
                 contrast_mode='all',
-                base_temperature=0.1,
+                base_temperature=0.07,
                 delta_reduction='sum'
             )
             

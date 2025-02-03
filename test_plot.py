@@ -21,8 +21,8 @@ def main():
     dataset = load_dataset(config["dataset_folder"])
     image_processor = get_image_processor(config["resize_to"])
 
-    model_name = "apical4_none_vanilla_regression_debug/checkpoint-51"
     vivit_config = VivitConfig.from_json_file(model_config)
+    model_name = vivit_config.model_name_or_path
 
     # model = VivitForVideoClassification.from_pretrained(
     #     pretrained_model_name_or_path=model_name

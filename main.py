@@ -1,5 +1,5 @@
 from utils import load_dataset, get_image_processor, collate_fn, compute_metrics
-from model import load_model
+from model import load_model, VivitWithOptionalProjectionHead
 from config import load_config, get_training_args
 from trainer import LogTrainer
 import os
@@ -33,21 +33,19 @@ def main():
     key = open('.secrets').read().strip()
     wandb.login(key=key)
 
+    # Load configuration and model
+    vivit_config = VivitConfig.from_json_file('model_config.json')
+    model = load_model(vivit_config=vivit_config, is_pretrained=True)
+    model.to('cuda')
+    # model = load_model(vivit_config=vivit_config)
+
     # Load dataset and image processor
     dataset = load_dataset(config['dataset_folder'])
-    image_processor = get_image_processor(config['resize_to'])
-
-    # Load configuration and model
-    num_frames = 32
-    #model_name = 'google/vivit-b-16x2-kinetics400'
-    model_name = 'google/vivit-b-16x2'
-    # vivit_config = get_vivit_config(num_frames, config['resize_to'], config, model_name)
-    vivit_config = VivitConfig.from_json_file('model_config.json')
-    model = load_model(vivit_config=vivit_config)
+    image_processor = get_image_processor(vivit_config.image_size)
 
     # Training arguments
     training_args = get_training_args(config)
-    
+        
     # Create Trainer
     trainer = LogTrainer(
         model=model,
@@ -55,12 +53,12 @@ def main():
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
         data_collator = lambda examples: collate_fn(examples, image_processor),
-        compute_metrics=compute_metrics,
-        training_mode=config['vivit_training_mode'],
+        # compute_metrics=compute_metrics,
+        training_mode=vivit_config.vivit_training_mode,
     )
 
     # Train the model
-    trainer.train()
+    trainer.train(resume_from_checkpoint=trainer.args.resume_from_checkpoint)
 
     # Save the model
     model.save_pretrained(config['run_name'])

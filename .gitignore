@@ -9,3 +9,4 @@ dataset_apical4_none/
 models/
 wandb/
 __pycache__/
+odg.md
