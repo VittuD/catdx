@@ -17,7 +17,6 @@ class LogTrainer(Trainer):
         self.epoch_wise_labels = torch.tensor([])
 
     def log(self, logs, start_time='NaN'):
-        ## TODO this computes twice the metrics since 'compute_metrics' is called before 'log'
         logs["learning_rate"] = self._get_learning_rate()
         logs["step"] = self.state.global_step
         # Add train/r2 data leveraging the batch_wise_predictions and batch_wise_labels

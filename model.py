@@ -2,9 +2,6 @@ from transformers import VivitForVideoClassification, VivitConfig
 import torch.nn as nn
 
 
-## TODO freeze the regression head when doing contrastive pretraining
-
-
 class VivitWithOptionalProjectionHead(VivitForVideoClassification):
     """
     Wrapper class for Vivit model with a custom projection head.

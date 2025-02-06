@@ -142,7 +142,7 @@ class KernelizedSupCon(nn.Module):
  
         # loss
         loss = - (self.temperature / self.base_temperature) * log_prob
-        return loss.nanmean() # Changed from mean to nanmean, TODO investigate why ther are some nan values
+        return loss.nanmean() # Changed from mean to nanmean
 
 
 if __name__ == '__main__':

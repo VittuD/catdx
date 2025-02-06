@@ -1,5 +1,5 @@
-from utils import load_dataset, get_image_processor, collate_fn, compute_metrics
-from model import load_model, VivitWithOptionalProjectionHead
+from utils import load_dataset, get_image_processor, collate_fn
+from model import load_model
 from config import load_config, get_training_args
 from trainer import LogTrainer
 import os
@@ -70,5 +70,6 @@ def main():
     for result in results:
         generate_predictions_report(result)
 
+## TODO Add the option to pass arguments via command line (they should override the config file)
 if __name__ == '__main__':
     main()
