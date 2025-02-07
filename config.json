@@ -1,7 +1,7 @@
 {
-    "run_name": "apical4_none_contrastive_b16_s05",
+    "run_name": "auto",
     "resume_from_checkpoint": false,
-    "dataset_folder": "dataset_apical4_none",
+    "dataset_folder": "apical4_none",
     "remove_unused_columns": false,
     "resize_to": 112,
     "fp16": true,

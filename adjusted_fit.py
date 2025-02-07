@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 import os
 from scipy.stats import pearsonr
 
-val_path = "apical4_none_420p_amp_wd_lr/checkpoint-1014/predictions_validation.csv"
-test_path = "apical4_none_420p_amp_wd_lr/checkpoint-1014/predictions_test.csv"
-parent_dir = "apical4_none_420p_amp_wd_lr/checkpoint-1014"
+parent_dir = "apical4_none_vanilla_regression"
+val_path = f"{parent_dir}/predictions_validation.csv"
+test_path = f"{parent_dir}/predictions_test.csv"
+
 
 # Load validation and test data
 val_data = pd.read_csv(val_path)

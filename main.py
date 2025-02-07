@@ -8,6 +8,7 @@ from model_testing import run_inference_and_save
 from prediction_analysis import generate_predictions_report
 import torch
 from transformers import VivitConfig
+from arg_parser import parse_args, update_config
 
 def main():
     # Check if CUDA is available
@@ -25,6 +26,14 @@ def main():
 
     # Load configuration
     config = load_config()
+
+    # Test arg_parser
+    args = parse_args()
+    print(args)
+    
+    config = update_config(config, args)
+    print(f'Updated config: {config}')
+    
 
     output_dir = config['run_name']
     os.makedirs(output_dir, exist_ok=True)
