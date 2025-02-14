@@ -27,13 +27,9 @@ def main():
     # Load configuration
     config = load_config()
 
-    # Test arg_parser
+    # Load CLI arguments
     args = parse_args()
-    print(args)
-    
     config = update_config(config, args)
-    print(f'Updated config: {config}')
-    
 
     output_dir = config['run_name']
     os.makedirs(output_dir, exist_ok=True)
@@ -54,7 +50,7 @@ def main():
 
     # Training arguments
     training_args = get_training_args(config)
-        
+
     # Create Trainer
     trainer = LogTrainer(
         model=model,
@@ -74,7 +70,7 @@ def main():
 
     # Run inference and save results
     results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=config['run_name'])
-    
+
     # Generate predictions report
     for result in results:
         generate_predictions_report(result)
