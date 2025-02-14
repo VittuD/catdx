@@ -11,36 +11,36 @@ class VivitWithOptionalProjectionHead(VivitForVideoClassification):
     def __init__(self, config: VivitConfig, projection_dim=128, add_projection_head=True):
         
         super().__init__(config)
+
         # Load the base ViViT model
-        self.vivit = VivitForVideoClassification.from_pretrained(
-            pretrained_model_name_or_path=config.model_name_or_path, 
-            config=config,
-            ignore_mismatched_sizes=True
-        )
+        # TODO might be a duplicate
+        # self.vivit = VivitForVideoClassification.from_pretrained(
+        #     pretrained_model_name_or_path=config.model_name_or_path, 
+        #     config=config,
+        #     ignore_mismatched_sizes=True
+        # )
+
         self.add_projection_head = add_projection_head
 
         # Add projection head if specified and not already present
         if self.add_projection_head:
             if not hasattr(self.vivit, 'projection_head'):
-                self.projection_head = nn.Sequential(
+                self.vivit.projection_head = nn.Sequential(
                     nn.Linear(config.hidden_size, config.hidden_size),
                     nn.ReLU(),
                     nn.Linear(config.hidden_size, projection_dim)
                 )
-            else:
-                self.projection_head = self.vivit.projection_head
+            # else: # If projection head is already present, use it
+            #     self.projection_head = self.vivit.projection_head
         else:
-            self.projection_head = None
-    
-    # def __init__(self, config):
-
+            self.vivit.projection_head = None
 
     ### hidden states -> | projection head | -> regression head -> logits
 
 
     def forward(self, pixel_values, **kwargs):
         # Forward pass through the base model
-        outputs = self.vivit(pixel_values=pixel_values, output_hidden_states=True, **kwargs)
+        outputs = super().forward(pixel_values=pixel_values, output_hidden_states=True, **kwargs)
         
         # Extract hidden states
         hidden_states = outputs.hidden_states  # List of hidden states from all transformer layers
@@ -51,10 +51,13 @@ class VivitWithOptionalProjectionHead(VivitForVideoClassification):
         # Apply projection head if specified
         projections = None
 
-        if self.add_projection_head and self.projection_head is not None:
+        if self.add_projection_head and self.vivit.projection_head is not None:
             # Optionally pool the sequence embeddings (mean pooling or [CLS] token)
-            pooled_output = last_hidden_state.mean(dim=1)  # Shape: (batch_size, hidden_size)
-            projections = self.projection_head(pooled_output)  # Shape: (batch_size, projection_dim)
+            # pooled_output = last_hidden_state.mean(dim=1)  # Shape: (batch_size, hidden_size)
+            # projections = self.vivit.projection_head(pooled_output)  # Shape: (batch_size, projection_dim)
+
+            cls_token = last_hidden_state[:, 0, :]  # (batch_size, hidden_size)
+            projections = self.vivit.projection_head(cls_token)  # Shape: (batch_size, projection_dim)
 
         # Return both logits and projections
         return {"logits": outputs.logits, "projections": projections, "hidden_states": hidden_states}
@@ -82,6 +85,19 @@ def load_model(vivit_config, is_pretrained=False, projection_dim=128, add_projec
         model = VivitWithOptionalProjectionHead(
             vivit_config, projection_dim, add_projection_head
         )
+
+    # Unfreeze everything preemptively to allow for fine-tuning
+    for param in model.parameters():
+        param.requires_grad = True
+    
+    # Re-initialize both classifier heads with random weights for:
+    # "vivit.classifier.weight", "vivit.classifier.bias",
+    # "classifier.weight", and "classifier.bias"
+    # if hasattr(vivit_config, "num_labels") and vivit_config.num_labels > 0:
+    #     
+    #     # Re-initialize the outer classifier head
+    #     model.classifier = nn.Linear(vivit_config.hidden_size, vivit_config.num_labels)
+    #     model.classifier.reset_parameters()
 
     # For contrastive pretraining, freeze the classifier head automatically
     if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "contrastive":
