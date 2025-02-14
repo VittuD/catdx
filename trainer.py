@@ -27,7 +27,7 @@ class LogTrainer(Trainer):
                 logs[f"{prefix}r2"] = compute_r2(self.epoch_wise_predictions, self.epoch_wise_labels)
                 logs[f"{prefix}pearson"] = float(pearsonr(self.epoch_wise_predictions, self.epoch_wise_labels)[0])
                 logs[f"{prefix}mae"] = compute_mae(self.epoch_wise_predictions, self.epoch_wise_labels)
-                logs[f"{prefix}std"] = compute_std(self.epoch_wise_predictions, self.epoch_wise_labels)
+                logs[f"{prefix}std"] = compute_std(self.epoch_wise_predictions)
                 logs[f"{prefix}mse"] = compute_mse(self.epoch_wise_predictions, self.epoch_wise_labels)
                 self.epoch_wise_predictions = torch.tensor([])
                 self.epoch_wise_labels = torch.tensor([])

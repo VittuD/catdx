@@ -38,8 +38,9 @@ def preprocess_example(example, image_processor, num_frames=32):
 def compute_mae(predictions, labels):
     return torch.mean(torch.abs(predictions - labels)).item()
 
-def compute_std(predictions, labels):
-    return torch.std(predictions - labels).item()
+# TODO what are we doing here...
+def compute_std(predictions):
+    return torch.std(predictions).item()
 
 def compute_mse(predictions, labels):
     return torch.mean((predictions - labels) ** 2).item()
@@ -66,7 +67,7 @@ def compute_metrics(eval_pred):
 
     return {
         "mae_e": compute_mae(predictions, labels),
-        "std_e": compute_std(predictions, labels),
+        "std_e": compute_std(predictions),
         "mse_e": compute_mse(predictions, labels),
         "r2_e": compute_r2(predictions, labels),
         "pearson_e": float(pearson_corr),
