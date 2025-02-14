@@ -37,6 +37,6 @@
     112,
     112
   ],
-  "vivit_training_mode": "contrastive",
-  "model_name_or_path": "google/vivit-b-16x2"
+  "vivit_training_mode": "regression",
+  "model_name_or_path": "apical4_none_112_8_2/checkpoint-260"
 }
