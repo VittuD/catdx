@@ -28,7 +28,7 @@ def main():
     #     pretrained_model_name_or_path=model_name
     # )
     
-    model = VivitWithOptionalProjectionHead.from_pretrained(pretrained_model_name_or_path = model_name, config=vivit_config)
+    model = VivitWithOptionalProjectionHead.from_pretrained(pretrained_model_name_or_path = model_name, config=vivit_config, ignore_mismatched_sizes=True)
     model.to('cuda')
     print(f'Loaded model from {model_name} with config {vivit_config}')
 
