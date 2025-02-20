@@ -3,16 +3,20 @@ import json
 import os
 
 # Load configuration from a JSON file
-def load_config(config_path='config.json'):
+def load_config(config_path='config.json', vivit_config=None):
     with open(config_path, 'r') as f:
-        config = json.load(f)
+        base_config = json.load(f)
         # If run name is 'auto' generate it
-        if config.get('run_name') == 'auto':
-            config['run_name'] = auto_name(config)
-        return config
+        if base_config.get('run_name') == 'auto':
+            base_config['run_name'] = auto_name(base_config, vivit_config)
+        return base_config
 
-def auto_name(config):
-    base_name = f"{config['dataset_folder']}_{config['resize_to']}_{config['per_device_train_batch_size']}_"
+def auto_name(config, vivit_config):
+    if vivit_config is None:
+        raise ValueError('vivit_config must be provided if run_name is set to "auto"')
+    
+    training_mode = vivit_config.training_mode
+    base_name = f"{training_mode}_"
     max_suffix = 0  # Start at zero so that if no runs exist, new suffix will be 1.
     
     for run in os.listdir('.'):

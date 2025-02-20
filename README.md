@@ -7,7 +7,7 @@ The config file is a json file that contains the following fields:
 - run_name: the name of the run, is also the name of the folder where the results are saved
 - dataset_folder: the path to the dataset folder
 - remove_unused_columns: boolean, whether to remove unused columns
-- vivit_training_mode: `contrastive` (freeze the prediction head and trains with contrastive loss), `regression` (trains only the prediction head with mse loss)
+- training_mode: `contrastive` (freeze the prediction head and trains with contrastive loss), `regression` (trains only the prediction head with mse loss)
 - freeze: `backbone`, `projection_head`, `classifier` or another `layer name` to freeze
 - fp16: boolean, whether to use fp16
 - resize_to: the size to resize the images to

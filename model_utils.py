@@ -29,7 +29,7 @@ def load_model(vivit_config, is_pretrained=False, projection_dim=128, add_projec
 
     # Handle training mode and freeze specified components
     handle_training_mode(vivit_config)
-    print(f"Training mode: {vivit_config.vivit_training_mode}")
+    print(f"Training mode: {vivit_config.training_mode}")
 
     if hasattr(vivit_config, "freeze") and isinstance(vivit_config.freeze, list):
         print(f"Freezing: {vivit_config.freeze}")
@@ -88,14 +88,14 @@ def handle_training_mode(vivit_config):
     Args:
         vivit_config: Configuration object with training mode and freeze list.
     """
-    if not hasattr(vivit_config, "vivit_training_mode"):
+    if not hasattr(vivit_config, "training_mode"):
         return
 
-    mode = vivit_config.vivit_training_mode
+    mode = vivit_config.training_mode
 
     # Normalize end-to-end modes immediately.
     if mode.startswith("end_to_end_"):
-        vivit_config.vivit_training_mode = mode.split("_")[-1]
+        vivit_config.training_mode = mode.split("_")[-1]
         return
 
     # Map training modes to components to freeze.
@@ -107,7 +107,7 @@ def handle_training_mode(vivit_config):
     # Default to 'regression' if an unknown mode is encountered.
     if mode not in freeze_map:
         print("Training mode set to default: regression")
-        vivit_config.vivit_training_mode = "regression"
+        vivit_config.training_mode = "regression"
         mode = "regression"
 
     for component in freeze_map[mode]:
