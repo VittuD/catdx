@@ -5,7 +5,7 @@ from utils import get_image_processor, load_dataset
 from trainer import LogTrainer
 from config import get_training_args, load_config
 from utils import compute_metrics, collate_fn
-from model import VivitWithOptionalProjectionHead
+from model_utils import VivitWithOptionalProjectionHead
 from transformers import VivitConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

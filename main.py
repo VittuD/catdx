@@ -1,5 +1,5 @@
 from utils import load_dataset, get_image_processor, collate_fn
-from model import load_model
+from model_utils import load_model
 from config import load_config, get_training_args
 from trainer import LogTrainer
 import os
