@@ -5,7 +5,8 @@ catdx/
 data/
 catdx
 .devcontainer/
-apical4_none/
+apical4_none*/
+apical4_none*/**
 models/
 wandb/
 __pycache__/
