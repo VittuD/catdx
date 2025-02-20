@@ -12,14 +12,6 @@ class VivitWithOptionalProjectionHead(VivitForVideoClassification):
         
         super().__init__(config)
 
-        # Load the base ViViT model
-        # TODO might be a duplicate
-        # self.vivit = VivitForVideoClassification.from_pretrained(
-        #     pretrained_model_name_or_path=config.model_name_or_path, 
-        #     config=config,
-        #     ignore_mismatched_sizes=True
-        # )
-
         self.add_projection_head = add_projection_head
 
         # Add projection head if specified and not already present
@@ -30,8 +22,6 @@ class VivitWithOptionalProjectionHead(VivitForVideoClassification):
                     nn.ReLU(),
                     nn.Linear(config.hidden_size, projection_dim)
                 )
-            # else: # If projection head is already present, use it
-            #     self.projection_head = self.vivit.projection_head
         else:
             self.vivit.projection_head = None
 

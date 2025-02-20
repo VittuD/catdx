@@ -49,15 +49,16 @@ def get_training_args(config):
 
 # Main for testing
 def main():
+    # Load model configuration
+    model_config = 'model_config.json'
+    model_config = VivitConfig.from_json_file(model_config)
+    print(model_config)
+
     # Load training configuration
     config = load_config('config.json')
     training_args = get_training_args(config)
     print(training_args)
 
-    # Load model configuration
-    model_config = 'model_config.json'
-    model_config = VivitConfig.from_json_file(model_config)
-    print(model_config)
 
 if __name__ == '__main__':
     main()
