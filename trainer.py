@@ -55,7 +55,7 @@ class LogTrainer(Trainer):
             # Example usage: method='expw' with a bigger sigma
             loss = kernelized_supcon_loss(
                 features=features.unsqueeze(1),  # Add an extra dimension [bsz, n_views, n_feats]
-                labels=labels, 
+                labels=labels,
                 temperature=0.07, 
                 sigma=1.0, 
                 method='expw',    # or 'threshold' or 'supcon' ...

@@ -89,31 +89,13 @@ def load_model(vivit_config, is_pretrained=False, projection_dim=128, add_projec
     # Unfreeze everything preemptively to allow for fine-tuning
     for param in model.parameters():
         param.requires_grad = True
-    
-    # Re-initialize both classifier heads with random weights for:
-    # "vivit.classifier.weight", "vivit.classifier.bias",
-    # "classifier.weight", and "classifier.bias"
-    # if hasattr(vivit_config, "num_labels") and vivit_config.num_labels > 0:
-    #     
-    #     # Re-initialize the outer classifier head
-    #     model.classifier = nn.Linear(vivit_config.hidden_size, vivit_config.num_labels)
-    #     model.classifier.reset_parameters()
 
-    # For contrastive pretraining, freeze the classifier head automatically
-    if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "contrastive":
-        print(f'Adding classifier head to the Freeze list for contrastive pretraining:')
-        # Add classifier to the list of elements to freeze if not already present
-        if "classifier" not in vivit_config.freeze:
-            vivit_config.freeze.append("classifier")
+    # Re-initialize the classifier heads with random weights
+    # reinitialize_classifier_heads(model, vivit_config)
 
-    # For regression training, freeze the backbone and projection head
-    if hasattr(vivit_config, "vivit_training_mode") and vivit_config.vivit_training_mode == "regression":
-        print(f'Adding backbone and projection head to the Freeze list for regression training:')
-        # Add backbone and projection head to the list of elements to freeze if not already present
-        if "backbone" not in vivit_config.freeze:
-            vivit_config.freeze.append("backbone")
-        if "projection_head" not in vivit_config.freeze:
-            vivit_config.freeze.append("projection_head")
+    # Handle the training mode and freeze the specified components
+    handle_training_mode(vivit_config)
+    print(f"Training mode: {vivit_config.vivit_training_mode}")
 
     if hasattr(vivit_config, "freeze") and isinstance(vivit_config.freeze, list):
         print(f"Freezing: {vivit_config.freeze}")
@@ -152,3 +134,50 @@ def freeze_backbone(model):
         # Freeze everything that isn't part of the classifier or projection head
         if "classifier" not in name and "projection_head" not in name:
             param.requires_grad = False
+
+
+def reinitialize_classifier_heads(model, vivit_config):
+    """
+    Re-initialize both classifier heads with random weights for:
+    "vivit.classifier.weight", "vivit.classifier.bias",
+    "classifier.weight", and "classifier.bias".
+    Args:
+        model: The model whose classifier heads will be re-initialized.
+        vivit_config: The configuration object containing num_labels and hidden_size.
+    """
+    if hasattr(vivit_config, "num_labels") and vivit_config.num_labels > 0:
+        # Re-initialize the outer classifier head
+        model.classifier = nn.Linear(vivit_config.hidden_size, vivit_config.num_labels)
+        model.classifier.reset_parameters()
+
+def handle_training_mode(vivit_config):
+    """
+    Handle the training mode and freeze the specified components.
+    Args:
+        vivit_config: The configuration object containing the training mode and freeze list.
+    """
+    if not hasattr(vivit_config, "vivit_training_mode"):
+        return
+    
+    mode = vivit_config.vivit_training_mode
+
+    # Normalize end-to-end modes and exit immediately.
+    if mode.startswith("end_to_end_"):
+        vivit_config.vivit_training_mode = mode.split("_")[-1]
+        return
+    
+    # Mapping of modes to the components to freeze.
+    freeze_map = {
+        "contrastive": ["classifier"],
+        "regression": ["backbone", "projection_head"]
+    }
+
+    # Default to regression if an unknown mode is encountered.
+    if mode not in freeze_map:
+        print("Training mode set to default: regression")
+        vivit_config.vivit_training_mode = "regression"
+        mode = "regression"
+
+    for component in freeze_map[mode]:
+        if component not in vivit_config.freeze:
+            vivit_config.freeze.append(component)

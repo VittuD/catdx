@@ -7,6 +7,7 @@ from config import get_training_args, load_config
 from utils import compute_metrics, collate_fn
 from model import VivitWithOptionalProjectionHead
 from transformers import VivitConfig
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def main():
 
@@ -47,10 +48,10 @@ def main():
     # Run inference and save results
     results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=model_name)
     print(results)
+    
     # Generate predictions report
-    for result in results:
-        print(f'Processing result: {result}')
-        generate_predictions_report(result)
+    for csv_path in results:
+        generate_predictions_report(csv_path)
 
 if __name__ == "__main__":
     main()

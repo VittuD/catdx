@@ -1,11 +1,17 @@
 import os
-import numpy as np
+import time
 import pandas as pd
 import seaborn as sns
 import torch
 from utils import compute_r2, compute_mae
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+
+# Set the backend to Agg
+matplotlib.use('Agg')
+# Turn off interactive mode
+plt.ioff()
 
 # Function to load predictions from a CSV file
 def load_predictions(csv_path):
@@ -90,3 +96,11 @@ def generate_predictions_report(csv_path):
 
     # Plot the actual vs predicted values and save to PDF
     plot_actual_vs_predicted(predictions, pdf_file, stats_text)
+
+# Test main with timing
+if __name__ == "__main__":
+    start_time = time.time()
+    csv_path = 'apical4_none_112_32_22/checkpoint-154/predictions_train.csv'
+    generate_predictions_report(csv_path)
+    elapsed_time = time.time() - start_time
+    print(f"Total execution time: {elapsed_time:.2f} seconds")

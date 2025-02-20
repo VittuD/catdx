@@ -38,6 +38,7 @@ def save_results(results, output_dir):
     # Save results for each partition separately
     for split, split_results in results.items():
         if split_results:  # Check if the results list is not empty
+            print(f"Saving predictions for {split} partition...")
             output_file = os.path.join(output_dir, f'predictions_{split}.csv')
             df = pd.DataFrame(split_results)
             df.to_csv(output_file, index=False)
