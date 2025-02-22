@@ -10,12 +10,15 @@ from contrastive import kernelized_supcon_loss
 
 class LogTrainer(Trainer):
     def __init__(self, training_mode='regression', *args, **kwargs):
+        # Pop kernel_type from kwargs
+        kernel_type = kwargs.pop('kernel_type', 'gaussian')
         super().__init__(*args, **kwargs)
         self.label_names+=['labels']
         self.training_mode = training_mode
         self.epoch_wise_predictions = torch.tensor([])
         self.epoch_wise_labels = torch.tensor([])
-
+        self.kernel_type = kernel_type
+        
     def log(self, logs, start_time='NaN'):
         logs["learning_rate"] = self._get_learning_rate()
         logs["step"] = self.state.global_step
@@ -56,6 +59,7 @@ class LogTrainer(Trainer):
             loss = kernelized_supcon_loss(
                 features=features.unsqueeze(1),  # Add an extra dimension [bsz, n_views, n_feats]
                 labels=labels,
+                kernel_type=self.kernel_type,  # 'gaussian', 'rbf', or 'cauchy'
                 temperature=0.07, 
                 sigma=1.0, 
                 method='expw',    # or 'threshold' or 'supcon' ...

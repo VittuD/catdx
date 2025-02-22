@@ -1,4 +1,4 @@
-from utils import load_dataset, get_image_processor, collate_fn
+from utils import load_dataset, get_image_processor, collate_fn, generate_log_filename
 from model_utils import load_model
 from config import load_config, get_training_args
 from trainer import LogTrainer
@@ -28,14 +28,17 @@ def main():
     vivit_config = VivitConfig.from_json_file('model_config.json')
 
     # Load configuration
-    config = load_config()
+    config = load_config(vivit_config=vivit_config)
 
     # Load CLI arguments
     args = parse_args()
     config = update_config(config, args)
-
+    
     output_dir = config['run_name']
     os.makedirs(output_dir, exist_ok=True)
+
+    # Set wandb project
+    os.environ["WANDB_PROJECT"] = f"catdx_{config['dataset_folder']}"
 
     # Log to wandb, they key must be in the file .secrets
     key = open('.secrets').read().strip()
@@ -62,6 +65,7 @@ def main():
         data_collator = lambda examples: collate_fn(examples, image_processor),
         # compute_metrics=compute_metrics,
         training_mode=vivit_config.training_mode,
+        kernel_type=config['kernel_type'],
     )
 
     # Train the model
@@ -74,8 +78,14 @@ def main():
     results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=config['run_name'])
 
     # Generate predictions report
+    pdf_files = []
     for result in results:
-        generate_predictions_report(result)
+        pdf_files.append(generate_predictions_report(result))
+    
+    # Log each PDF file to wandb as its own artifact with a dynamically extracted alias
+    for pdf_file in pdf_files:
+        wandb.save(pdf_file)
+
 
 ## TODO Add the option to pass arguments via command line (they should override the config file)
 if __name__ == '__main__':
