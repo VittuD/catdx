@@ -2,10 +2,11 @@ import datasets
 import torch
 from torcheval.metrics import R2Score
 import numpy as np
-from transformers import VivitImageProcessor
+from transformers import VivitImageProcessor, TrainerCallback
 from torchvision.transforms import Compose, Normalize, RandomCrop, ColorJitter, ToTensor
 import torchvision.transforms.functional as F
 import random
+import os
 
 def get_image_processor(resize_to):
     return VivitImageProcessor(
@@ -161,6 +162,8 @@ def compute_metrics(eval_pred):
         "pearson_e": float(pearson_corr),
     }
 
-# Overwrite 'eval' to 'val' in logs (still fails but it's no priority)
-# def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="val"):
-#        return super().evaluate(self, eval_dataset=eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)
+def generate_log_filename(pdf_file, run_name):
+    filename = os.path.basename(pdf_file)
+    alias = filename.split('_')[-1].split('.')[0]
+    new_filename = f"{run_name}_predictions_report_{alias}.pdf"
+    return new_filename

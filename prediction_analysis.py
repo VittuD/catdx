@@ -57,7 +57,9 @@ def plot_actual_vs_predicted(predictions, pdf_file, stats_text):
 
         plt.xlabel('Actual')
         plt.ylabel('Predicted')
-        plt.title('Actual vs Predicted with Linear Fit')
+        # Split of interest is last word in the title before .pdf
+        split = pdf_file.split('_')[-1].split('.')[0]
+        plt.title(f'Actual vs Predicted Linear Fit ({split})')
         plt.legend()
         pdf.savefig()
         plt.close()
@@ -96,6 +98,8 @@ def generate_predictions_report(csv_path):
 
     # Plot the actual vs predicted values and save to PDF
     plot_actual_vs_predicted(predictions, pdf_file, stats_text)
+
+    return pdf_file
 
 # Test main with timing
 if __name__ == "__main__":
