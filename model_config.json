@@ -37,6 +37,6 @@
     112,
     112
   ],
-  "training_mode": "regression",
-  "model_name_or_path": "apical4_none_112_32_35/"
+  "training_mode": "end_to_end_regression",
+  "model_name_or_path": "google/vivit-b-16x2"
 }

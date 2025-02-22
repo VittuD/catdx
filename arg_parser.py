@@ -7,6 +7,20 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--contrastive_sigma",
+        type=float,
+        default=None,
+        help="Sigma for contrastive kernelized loss"
+    )
+
+    parser.add_argument(
+        "--kernel_type",
+        type=str,
+        default=None,
+        help="Type of kernel for contrastive loss."
+    )
+
+    parser.add_argument(
         "--run_name",
         type=str,
         help="Name of the training run."

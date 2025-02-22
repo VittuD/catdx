@@ -8,15 +8,24 @@ def load_config(config_path='config.json', vivit_config=None):
         base_config = json.load(f)
         # If run name is 'auto' generate it
         if base_config.get('run_name') == 'auto':
-            base_config['run_name'] = auto_name(base_config, vivit_config)
+            base_config['run_name'] = auto_name(vivit_config)
         return base_config
 
-def auto_name(config, vivit_config):
+def auto_name(vivit_config):
     if vivit_config is None:
         raise ValueError('vivit_config must be provided if run_name is set to "auto"')
     
     training_mode = vivit_config.training_mode
-    base_name = f"{training_mode}_"
+    # Training mode map to shorten the run name
+    mode_map = {
+        'regression': 'reg',
+        'contrastive': 'con',
+        'end_to_end_regression': 'rege2e',
+        'end_to_end_contrastive': 'cone2e',
+    }
+    training_mode = mode_map.get(training_mode, training_mode)
+
+    base_name = f"{training_mode}_sz{vivit_config.image_size}_"
     max_suffix = 0  # Start at zero so that if no runs exist, new suffix will be 1.
     
     for run in os.listdir('.'):
@@ -48,6 +57,7 @@ def get_training_args(config):
         fp16=config.get('fp16', True),
         remove_unused_columns=config.get('remove_unused_columns', False),
         resume_from_checkpoint=config.get('resume_from_checkpoint', False),
+        lr_scheduler_type=config.get('lr_scheduler_type', 'linear'),
         seed=42,
     )
 
