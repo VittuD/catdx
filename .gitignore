@@ -11,3 +11,4 @@ models/
 wandb/
 __pycache__/
 odg.md
+test_run/*
