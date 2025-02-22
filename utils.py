@@ -161,9 +161,3 @@ def compute_metrics(eval_pred):
         "r2_e": compute_r2(predictions, labels),
         "pearson_e": float(pearson_corr),
     }
-
-def generate_log_filename(pdf_file, run_name):
-    filename = os.path.basename(pdf_file)
-    alias = filename.split('_')[-1].split('.')[0]
-    new_filename = f"{run_name}_predictions_report_{alias}.pdf"
-    return new_filename
