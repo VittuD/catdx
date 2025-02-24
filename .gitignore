@@ -12,3 +12,7 @@ wandb/
 __pycache__/
 odg.md
 test_run/*
+reg*/
+reg*/**
+con*/
+con*/**
