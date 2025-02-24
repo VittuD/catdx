@@ -42,6 +42,7 @@ def kernelized_supcon_loss(
     features: torch.Tensor,
     labels: torch.Tensor,
     kernel_type: Literal['gaussian', 'rbf', 'cauchy'] = 'gaussian',
+    temperature: float = 0.07,
     sigma: float = 1.0,
     method: str = 'expw',
     contrast_mode: str = 'all',
@@ -85,7 +86,7 @@ def kernelized_supcon_loss(
     # Create the loss function object
     loss_fn = KernelizedSupCon(
         method=method,
-        temperature=base_temperature,
+        temperature=temperature,
         contrast_mode=contrast_mode,
         base_temperature=base_temperature,
         kernel=kernel,
