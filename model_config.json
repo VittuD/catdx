@@ -37,6 +37,6 @@
     112,
     112
   ],
-  "training_mode": "end_to_end_regression",
+  "training_mode": "end_to_end_contrastive",
   "model_name_or_path": "google/vivit-b-16x2"
 }
