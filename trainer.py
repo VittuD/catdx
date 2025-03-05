@@ -1,25 +1,40 @@
 # trainer.py
 
-from transformers import Trainer
+from typing import Union
+from TrainingArguments_projection import TrainingArguments_projection
+from transformers import Trainer, TrainingArguments, PreTrainedModel
 from utils import compute_r2, compute_mae, compute_std, compute_mse
 from scipy.stats import pearsonr
 import torch
-
-# Import the new wrapper function
+from torch import nn
 from contrastive import kernelized_supcon_loss
 
 class LogTrainer(Trainer):
-    def __init__(self, training_mode='regression', *args, **kwargs):
-        self.kernel_type = kwargs.pop('kernel_type', 'gaussian')
-        self.contrastive_sigma = kwargs.pop('contrastive_sigma', 1.0)
-        if kwargs.get('args'):
-            kwargs['args'].kernel_type = self.kernel_type
-        super().__init__(*args, **kwargs)
+        
+    def __init__(self,
+                model: Union[PreTrainedModel, nn.Module] = None,
+                args: TrainingArguments_projection = None,
+                **kwargs):
+        
+        print("LogTrainer init")
+        print(f"args: {args}")
+        print(f"kwargs: {kwargs}")
+
+        # Pop attributes from args using its pop_attributes method, if available.
+        self.training_mode = args.pop_attribute('training_mode', 'regression')
+        self.kernel_type = args.pop_attribute('kernel_type', 'gaussian')
+        self.contrastive_sigma = args.pop_attribute('contrastive_sigma', 1.0)
+
+        model.set_training_mode(self.training_mode)
+
+        super().__init__(model=model, args=args, **kwargs)
+
         self.label_names+=['labels']
-        self.training_mode = training_mode
         self.epoch_wise_predictions = torch.tensor([])
         self.epoch_wise_labels = torch.tensor([])
-        
+        # if hasattr(self.model, 'set_training_mode'):
+        #     self.model.set_training_mode(self.training_mode)
+
     def log(self, logs, start_time='NaN'):
         logs["learning_rate"] = self._get_learning_rate()
         logs["step"] = self.state.global_step
@@ -48,30 +63,40 @@ class LogTrainer(Trainer):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
 
-        # Extract features from the model's output
-        # Suppose 'outputs' has 'projections' if we want contrastive
-        features = outputs['projections'] if 'projections' in outputs else None
+        # Extract features (e.g., 'projections') if available for contrastive loss
+        features = outputs.get("projections")  # returns None if key is absent
 
-        # If features is None, use MSE loss; else use kernelized_supcon_loss
-        if self.training_mode == 'regression' or features is None:
+        # Determine whether to use MSE loss
+        use_mse = features is None or 'regression' in model.training_mode
+
+        # Warn if features are missing
+        if features is None:
+            print("Warning: 'projections' not found. Defaulting to regression (MSE loss), which may be unintended.")
+
+        if use_mse:
             loss = self.mse_loss(outputs, labels)
         else:
-            # Example usage: method='expw' with a bigger sigma
             loss = kernelized_supcon_loss(
-                features=features.unsqueeze(1),  # Add an extra dimension [bsz, n_views, n_feats]
+                features=features.unsqueeze(1),  # Add extra dimension: [bsz, n_views, n_feats]
                 labels=labels,
-                kernel_type=self.kernel_type,  # 'gaussian', 'rbf', or 'cauchy'
-                temperature=0.07, 
-                sigma=self.contrastive_sigma, 
-                method='expw',    # or 'threshold' or 'supcon' ...
+                kernel_type=self.kernel_type,    # Options: 'gaussian', 'rbf', or 'cauchy'
+                temperature=0.07,
+                sigma=self.contrastive_sigma,
+                method='expw',                  # Options: 'expw', 'threshold', 'supcon', etc.
                 contrast_mode='all',
                 base_temperature=0.07,
                 delta_reduction='sum'
             )
-            
+
         # Log predictions and labels for r2 calculation
-        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs['logits'].squeeze())
-        self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
-        self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
+        predictions = outputs['logits'].squeeze()
+        if predictions.dim() == 0:
+            predictions = predictions.unsqueeze(0)
+        self.epoch_wise_predictions = torch.cat(
+            (self.epoch_wise_predictions, predictions.detach().cpu())
+        )
+        self.epoch_wise_labels = torch.cat(
+            (self.epoch_wise_labels, labels.detach().cpu())
+        )
 
         return (loss, outputs) if return_outputs else loss

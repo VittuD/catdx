@@ -42,23 +42,23 @@ def auto_name(vivit_config):
     
 def get_training_args(config):
     return TrainingArguments(
-        output_dir=config.get('run_name'),
-        report_to=config.get('report_to', 'wandb'),
-        learning_rate=config.get('learning_rate', 5e-5),
-        warmup_steps=config.get('warmup_steps', 0),
-        per_device_train_batch_size=config.get('per_device_train_batch_size', 8),
-        per_device_eval_batch_size=config.get('per_device_eval_batch_size', 8),
-        num_train_epochs=config.get('num_train_epochs', 5),
-        weight_decay=config.get('weight_decay', 0.01),
-        logging_first_step=config.get('logging_first_step', True),
-        logging_strategy=config.get('save_strategy', 'epoch'),
-        save_strategy=config.get('save_strategy', 'epoch'),
         eval_strategy=config.get('eval_strategy', 'epoch'),
         fp16=config.get('fp16', True),
-        remove_unused_columns=config.get('remove_unused_columns', False),
-        resume_from_checkpoint=config.get('resume_from_checkpoint', False),
+        learning_rate=config.get('learning_rate', 5e-5),
+        logging_first_step=config.get('logging_first_step', True),
+        logging_strategy=config.get('save_strategy', 'epoch'),
         lr_scheduler_type=config.get('lr_scheduler_type', 'linear'),
+        num_train_epochs=config.get('num_train_epochs', 5),
+        output_dir=config.get('run_name'),
+        per_device_eval_batch_size=config.get('per_device_eval_batch_size', 8),
+        per_device_train_batch_size=config.get('per_device_train_batch_size', 8),
+        remove_unused_columns=config.get('remove_unused_columns', False),
+        report_to=config.get('report_to', 'wandb'),
+        resume_from_checkpoint=config.get('resume_from_checkpoint', False),
+        save_strategy=config.get('save_strategy', 'epoch'),
         seed=42,
+        warmup_steps=config.get('warmup_steps', 0),
+        weight_decay=config.get('weight_decay', 0.01),
     )
 
 # Main for testing

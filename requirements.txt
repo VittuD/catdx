@@ -3,7 +3,9 @@ av
 datasets
 decord
 evaluate
+hydra-core
 matplotlib
+omegaconf
 opencv-python-headless
 openpyxl
 pydicom
