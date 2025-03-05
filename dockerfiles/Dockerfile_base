@@ -11,7 +11,7 @@ COPY requirements.txt /workspace/requirements.txt
 RUN pip install --no-cache-dir -r /workspace/requirements.txt
 
 # Copy accelerate configuration file
-COPY accelerate_multi_config.yaml /home/eidos/.cache/huggingface/accelerate/default_config.yaml
+# COPY accelerate_multi_config.yaml /home/eidos/.cache/huggingface/accelerate/default_config.yaml
 
 # Set the working directory
 WORKDIR /workspace

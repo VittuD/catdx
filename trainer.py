@@ -21,9 +21,9 @@ class LogTrainer(Trainer):
         print(f"kwargs: {kwargs}")
 
         # Pop attributes from args using its pop_attributes method, if available.
-        self.training_mode = args.pop_attribute('training_mode', 'regression')
-        self.kernel_type = args.pop_attribute('kernel_type', 'gaussian')
-        self.contrastive_sigma = args.pop_attribute('contrastive_sigma', 1.0)
+        self.training_mode = args.training_mode
+        self.kernel_type = args.kernel_type
+        self.contrastive_sigma = args.contrastive_sigma
 
         model.set_training_mode(self.training_mode)
 

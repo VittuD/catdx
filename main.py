@@ -82,11 +82,9 @@ def main(cfg: DictConfig):
     trainer.train(resume_from_checkpoint=trainer.args.resume_from_checkpoint)
 
     # Save the model
-    # TODO Check if hydra naming works
     model.save_pretrained(cfg.experiment_name)
 
     # Run inference and save results
-    # TODO Check if hydra naming works
     results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=cfg.experiment_name)
 
     # Generate predictions report
