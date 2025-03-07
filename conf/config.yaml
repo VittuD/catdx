@@ -21,7 +21,7 @@ model_config:
 
 trainer_config:
   contrastive_sigma: 0.15
-  dataset_folder: apical4_none
+  dataset_folder: fix_apical4
   training_mode: end_to_end_contrastive
   eval_strategy: epoch
   fp16: true

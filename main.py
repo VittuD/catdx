@@ -37,15 +37,6 @@ def main(cfg: DictConfig):
     experiment_dir = cfg.experiment_name
     os.makedirs(experiment_dir, exist_ok=True)
     
-    # Write out the model and trainer configs as JSON files.
-    model_json, trainer_json = write_configs_to_json(cfg, experiment_dir)
-    
-    # Load Vivit configuration
-    vivit_config = VivitConfig.from_json_file(model_json)
-    
-    # Set wandb project
-    os.environ["WANDB_PROJECT"] = f"catdx_{cfg.trainer_config.dataset_folder}"
-
     # Set working directory to the home dir for dataset and secrets
     os.chdir('/scratch/catdx/')
 
@@ -56,10 +47,20 @@ def main(cfg: DictConfig):
     # Load dataset and image processor
     transforms = None
     dataset = load_dataset(cfg.trainer_config.dataset_folder, augmentation=transforms)
-    image_processor = get_image_processor(vivit_config.image_size, cfg.model_config.num_channels)
 
     # Go back to the base dir
     os.chdir(base_dir)
+    
+    # Write out the model and trainer configs as JSON files.
+    model_json, trainer_json = write_configs_to_json(cfg, experiment_dir)
+    
+    # Load Vivit configuration
+    vivit_config = VivitConfig.from_json_file(model_json)
+
+    image_processor = get_image_processor(vivit_config.image_size, cfg.model_config.num_channels)
+    
+    # Set wandb project
+    os.environ["WANDB_PROJECT"] = f"catdx_{cfg.trainer_config.dataset_folder}"
 
     # Load model
     model = load_model(vivit_config=vivit_config, is_pretrained=True)

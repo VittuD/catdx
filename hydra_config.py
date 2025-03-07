@@ -34,9 +34,12 @@ def auto_name_from_yaml(cfg: DictConfig, base_dir="."):
     }
     short_mode = mode_map.get(training_mode, training_mode)
     image_size = cfg.model_config.image_size
+    learning_rate = repr(cfg.trainer_config.learning_rate)
+    contrastive_sigma = repr(cfg.trainer_config.contrastive_sigma)
+    weight_decay = repr(cfg.trainer_config.weight_decay)
 
     # Create the base name using the short training mode and image size.
-    base_name = f"{short_mode}_sz{image_size}_"
+    base_name = f"{short_mode}_sz{image_size}_lr{learning_rate}_cs{contrastive_sigma}_wd{weight_decay}_"
     max_suffix = 0
     
     # Look for directories (or files) in base_dir that start with base_name.

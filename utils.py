@@ -1,4 +1,3 @@
-import datasets
 import torch
 from torcheval.metrics import R2Score
 import numpy as np
@@ -6,12 +5,11 @@ from transformers import VivitImageProcessor, TrainerCallback
 import torchvision.transforms.functional as F
 from PIL import Image
 import cv2
-import decord
-from decord import VideoReader, VideoLoader
-import tempfile
+from decord import VideoReader
 import os
-from transformers.image_utils import ChannelDimension
-
+import pandas as pd
+from datasets import Dataset, Features, Value, Video, DatasetDict
+import datasets
 
 VivitImageProcessor()
 
@@ -30,11 +28,37 @@ def get_image_processor(resize_to, num_channels):
     )
 
 # Dataset Utilities
+def create_datasets(csv_file, video_folder):
+        df = pd.read_csv(csv_file)
+        df["file_name"] = df["file_name"].apply(lambda x: os.path.abspath(os.path.join(video_folder, x)))
+
+        features = Features({
+            "file_name": Video(),
+            "CO": Value("float"),
+            "partition": Value("string"),
+        })
+
+        dataset = Dataset.from_pandas(df, features=features)
+        train_dataset = dataset.filter(lambda x: x["partition"] == "train")
+        val_dataset = dataset.filter(lambda x: x["partition"] == "val")
+        test_dataset = dataset.filter(lambda x: x["partition"] == "test")
+        
+        return DatasetDict({
+            "train": train_dataset,
+            "validation": val_dataset,
+            "test": test_dataset,
+        })
+
 def load_dataset(dataset_folder, augmentation=None):
     # Augmentation not implemented yet
-    dataset = datasets.load_dataset(dataset_folder)
-    dataset = dataset.rename_column('video', 'pixel_values')
+    # Old way, works with apical4_none dir structure
+    # dataset = datasets.load_dataset(dataset_folder)
+    # New way, works with preprocessed/mp4/apical4 dir structure
+    dataset = create_datasets(os.path.join(dataset_folder, "all_files_with_partition.csv"), dataset_folder)
+    # dataset = dataset.rename_column('video', 'pixel_values')
+    dataset = dataset.rename_column('file_name', 'pixel_values')
     dataset = dataset.rename_column('CO', 'labels')
+    print(dataset)
     return dataset
 
 def collate_fn(examples, image_processor, num_channels):
@@ -53,7 +77,14 @@ def preprocess_example(example, image_processor, num_channels=1, num_frames=32):
         original_frames = convert_to_grayscale(original_frames)
         original_frames = [np.array(frame)[..., None] for frame in original_frames]
     frames = original_frames
+    # Save the video back as mp4 with cv2 for manual sanity check
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # out = cv2.VideoWriter('original.mp4', fourcc, 30, (frames[0].shape[1], frames[0].shape[0]))
+    # for frame in frames:
+    #     out.write(frame)
+    # out.release()
 
+    
     if len(frames) < num_frames:
         frames = frames * (num_frames // len(frames)) + frames[:num_frames % len(frames)]
     else:
