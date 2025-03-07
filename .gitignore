@@ -18,3 +18,5 @@ cone*/
 cone*/**
 outputs/
 outputs/**
+preprocessed/apical4/**
+fix_apical4/**
