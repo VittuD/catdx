@@ -7,7 +7,6 @@ catdx
 .devcontainer/
 apical4_none*/
 apical4_none*/**
-models/
 wandb/
 __pycache__/
 odg.md
@@ -18,5 +17,5 @@ cone*/
 cone*/**
 outputs/
 outputs/**
-preprocessed/apical4/**
 fix_apical4/**
+apical4_bw/**

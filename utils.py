@@ -51,14 +51,16 @@ def create_datasets(csv_file, video_folder):
 
 def load_dataset(dataset_folder, augmentation=None):
     # Augmentation not implemented yet
+
     # Old way, works with apical4_none dir structure
     # dataset = datasets.load_dataset(dataset_folder)
+    # dataset = dataset.rename_column('video', 'pixel_values')
+
     # New way, works with preprocessed/mp4/apical4 dir structure
     dataset = create_datasets(os.path.join(dataset_folder, "all_files_with_partition.csv"), dataset_folder)
-    # dataset = dataset.rename_column('video', 'pixel_values')
     dataset = dataset.rename_column('file_name', 'pixel_values')
+
     dataset = dataset.rename_column('CO', 'labels')
-    print(dataset)
     return dataset
 
 def collate_fn(examples, image_processor, num_channels):
@@ -83,7 +85,6 @@ def preprocess_example(example, image_processor, num_channels=1, num_frames=32):
     # for frame in frames:
     #     out.write(frame)
     # out.release()
-
     
     if len(frames) < num_frames:
         frames = frames * (num_frames // len(frames)) + frames[:num_frames % len(frames)]
