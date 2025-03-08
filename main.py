@@ -14,7 +14,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from hydra_config import update_experiment_name, write_configs_to_json
 
-@hydra.main(config_path="conf", config_name="config")
+@hydra.main(config_path="configs", config_name="config")
 def main(cfg: DictConfig):
     # Check if CUDA is available
     if torch.cuda.is_available():
