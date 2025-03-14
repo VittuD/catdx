@@ -1,4 +1,4 @@
-experiment_name: auto
+experiment_name: test_e2e_reg
 
 model_config:
   attention_probs_dropout_prob: 0.0
@@ -22,15 +22,15 @@ model_config:
 trainer_config:
   contrastive_sigma: 0.15
   dataset_folder: fix_apical4
-  training_mode: end_to_end_contrastive
+  training_mode: end_to_end_regression
   eval_strategy: epoch
   fp16: true
   kernel_type: gaussian
-  learning_rate: 1e-4
+  learning_rate: 5e-3
   logging_first_step: true
   logging_strategy: epoch
   lr_scheduler_type: constant_with_warmup
-  num_train_epochs: 10
+  num_train_epochs: 100
   per_device_eval_batch_size: 32
   per_device_train_batch_size: 32
   remove_unused_columns: false

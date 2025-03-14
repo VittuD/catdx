@@ -3,7 +3,7 @@
 import math
 import torch
 from typing import Literal
-from losses import KernelizedSupCon
+from src.losses.losses import KernelizedSupCon
 
 def gaussian_kernel(labels, sigma: float = 1.0):
     """

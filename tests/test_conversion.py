@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 import cv2
-import preprocessed.conversion as conversion
+import src.utils.preprocessed.conversion as conversion
 
 class TestConvertVideoDcm(unittest.TestCase):
     def setUp(self):

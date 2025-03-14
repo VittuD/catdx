@@ -1,18 +1,16 @@
-from utils import load_dataset, get_image_processor, collate_fn
-from model_utils import load_model
-from config import load_config, get_training_args
-from trainer import LogTrainer
+from src.utils.utils import load_dataset, get_image_processor, collate_fn
+from src.models.model_utils import load_model
+from src.trainers.trainer import LogTrainer
 import os
 import wandb
-from model_testing import run_inference_and_save
-from prediction_analysis import generate_predictions_report
+from src.models.model_testing import run_inference_and_save
+from src.scripts.prediction_analysis import generate_predictions_report
 import torch
 from transformers import VivitConfig, HfArgumentParser
-from arg_parser import parse_args, update_config
-from TrainingArguments_projection import TrainingArguments_projection
+from src.trainers.TrainingArguments_projection import TrainingArguments_projection
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from hydra_config import update_experiment_name, write_configs_to_json
+from src.config.hydra_config import update_experiment_name, write_configs_to_json
 
 @hydra.main(config_path="configs", config_name="config")
 def main(cfg: DictConfig):
@@ -66,6 +64,8 @@ def main(cfg: DictConfig):
     model = load_model(vivit_config=vivit_config, is_pretrained=True)
     model.to('cuda')
 
+    print(model)
+    
     # Training arguments
     parser = HfArgumentParser(TrainingArguments_projection)
     training_args, = parser.parse_json_file(json_file=trainer_json, allow_extra_keys=True)

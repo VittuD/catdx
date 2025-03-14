@@ -1,13 +1,13 @@
 # trainer.py
 
 from typing import Union
-from TrainingArguments_projection import TrainingArguments_projection
+from src.trainers.TrainingArguments_projection import TrainingArguments_projection
 from transformers import Trainer, TrainingArguments, PreTrainedModel
-from utils import compute_r2, compute_mae, compute_std, compute_mse
+from src.utils.utils import compute_r2, compute_mae, compute_std, compute_mse
 from scipy.stats import pearsonr
 import torch
 from torch import nn
-from contrastive import kernelized_supcon_loss
+from src.losses.contrastive import kernelized_supcon_loss
 
 class LogTrainer(Trainer):
         
@@ -16,11 +16,11 @@ class LogTrainer(Trainer):
                 args: TrainingArguments_projection = None,
                 **kwargs):
         
-        print("LogTrainer init")
-        print(f"args: {args}")
-        print(f"kwargs: {kwargs}")
+        # print("LogTrainer init")
+        # print(f"args: {args}")
+        # print(f"kwargs: {kwargs}")
 
-        # Pop attributes from args using its pop_attributes method, if available.
+        # Get attributes from args
         self.training_mode = args.training_mode
         self.kernel_type = args.kernel_type
         self.contrastive_sigma = args.contrastive_sigma

@@ -3,7 +3,7 @@ import time
 import pandas as pd
 import seaborn as sns
 import torch
-from utils import compute_r2, compute_mae
+from src.utils.utils import compute_r2, compute_mae
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages

@@ -1,11 +1,11 @@
 import os
-from prediction_analysis import generate_predictions_report
-from model_testing import run_inference_and_save
-from utils import get_image_processor, load_dataset
-from trainer import LogTrainer
-from config import get_training_args, load_config
-from utils import compute_metrics, collate_fn
-from model_utils import VivitWithOptionalProjectionHead
+from src.scripts.prediction_analysis import generate_predictions_report
+from src.models.model_testing import run_inference_and_save
+from src.utils.utils import get_image_processor, load_dataset
+from src.trainers.trainer import LogTrainer
+from src.config.config import get_training_args, load_config
+from src.utils.utils import compute_metrics, collate_fn
+from src.models.model_utils import VivitWithOptionalProjectionHead
 from transformers import VivitConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

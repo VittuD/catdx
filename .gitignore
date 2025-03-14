@@ -1,8 +1,8 @@
 .secrets
 .vscode/
-dataset_apical4_none/
 catdx/
 data/
+!src/data/
 catdx
 .devcontainer/
 apical4_none*/
@@ -10,11 +10,6 @@ apical4_none*/**
 wandb/
 __pycache__/
 odg.md
-test_run/*
-reg*/
-reg*/**
-cone*/
-cone*/**
 outputs/
 outputs/**
 fix_apical4/**

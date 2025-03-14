@@ -1,5 +1,5 @@
 import torch.nn as nn
-from modeling_vivit_projection import VivitWithOptionalProjectionHead
+from src.models.modeling_vivit_projection import VivitWithOptionalProjectionHead
 
 def load_model(vivit_config, is_pretrained=False, projection_dim=128, add_projection_head=True):
     """
@@ -24,7 +24,7 @@ def load_model(vivit_config, is_pretrained=False, projection_dim=128, add_projec
         model = VivitWithOptionalProjectionHead(vivit_config, projection_dim, add_projection_head)
 
     # Debug: print each parameter's trainability
-    for name, param in model.named_parameters():
-        print(f'{name}: {param.requires_grad}')
+    # for name, param in model.named_parameters():
+    #     print(f'{name}: {param.requires_grad}')
 
     return model
