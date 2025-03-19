@@ -2,6 +2,8 @@
 
 import math
 import torch
+import torch.nn.functional as F
+import plotly.graph_objects as go
 from typing import Literal
 from src.losses.losses import KernelizedSupCon
 
@@ -94,7 +96,88 @@ def kernelized_supcon_loss(
     )
 
     # Normalize the features for dot product
-    normalized_features = torch.nn.functional.normalize(features, dim=-1, p=2)
+    normalized_features = F.normalize(features, dim=-1, p=2)
 
     # Forward pass
     return loss_fn.forward(normalized_features, labels)
+
+
+# Plotting helper functions
+
+def plot_and_save_kernel_heatmap(kernel_matrix: torch.Tensor, labels: torch.Tensor, 
+                                 title: str, filename: str):
+    """
+    Plots a heatmap with Plotly, labeling both axes by the actual label values,
+    and saves to a file (PNG, JPEG, PDF, SVG, etc.) without displaying.
+    Requires kaleido or orca for static image export.
+    """
+    # Convert torch Tensors to numpy
+    z_vals = kernel_matrix.detach().cpu().numpy()
+    # Use labels themselves for axes
+    axis_vals = labels.detach().cpu().tolist()
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            x=axis_vals,
+            y=axis_vals,
+            z=z_vals,
+            colorscale='Viridis'
+        )
+    )
+    fig.update_layout(
+        title=title,
+        xaxis_title='Labels',
+        yaxis_title='Labels',
+        title_x=0.5,
+    )
+
+    # Save to file (e.g. PNG). For HTML export, you can use fig.write_html().
+    fig.write_image(filename)
+
+# Testing main
+def main():
+    # Define some dummy data
+    features = torch.randn(5, 5, 1)
+    labels = torch.rand(5)
+    sigma = 0.1
+    print("Features:")
+    print(features)
+    print("Labels:")
+    print(labels)
+
+    # Compute kernel matrices
+    gaussian_kernel_results = gaussian_kernel(labels, sigma=sigma)
+    rbf_kernel_results = rbk_kernel(labels, sigma=sigma)
+    cauchy_kernel_results = cauchy_kernel(labels, sigma=sigma)
+
+    # Print and save each kernel matrix
+    print("Gaussian Kernel:")
+    print(gaussian_kernel_results)
+    plot_and_save_kernel_heatmap(gaussian_kernel_results, labels, 
+                                 "Gaussian Kernel Heatmap", "gaussian_kernel.png")
+
+    print("RBF Kernel:")
+    print(rbf_kernel_results)
+    plot_and_save_kernel_heatmap(rbf_kernel_results, labels, 
+                                 "RBF Kernel Heatmap", "rbf_kernel.png")
+
+    print("Cauchy Kernel:")
+    print(cauchy_kernel_results)
+    plot_and_save_kernel_heatmap(cauchy_kernel_results, labels, 
+                                 "Cauchy Kernel Heatmap", "cauchy_kernel.png")
+
+    # Test the kernelized_supcon_loss function
+    print("Testing KernelizedSupCon with Gaussian kernel:")
+    loss_gaussian = kernelized_supcon_loss(features, labels, kernel_type='gaussian', sigma=sigma)
+    print(loss_gaussian)
+
+    print("Testing KernelizedSupCon with RBF kernel:")
+    loss_rbf = kernelized_supcon_loss(features, labels, kernel_type='rbf', sigma=sigma)
+    print(loss_rbf)
+
+    print("Testing KernelizedSupCon with Cauchy kernel:")
+    loss_cauchy = kernelized_supcon_loss(features, labels, kernel_type='cauchy', sigma=sigma)
+    print(loss_cauchy)
+
+if __name__ == "__main__":
+    main()

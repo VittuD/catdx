@@ -1,14 +1,17 @@
 accelerate
+albumentations
 av
 datasets
 decord
 evaluate
 hydra-core
+kaleido
 matplotlib
 omegaconf
 opencv-python-headless
 openpyxl
 pydicom
+plotly
 seaborn
 torch
 torcheval

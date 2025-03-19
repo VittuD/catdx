@@ -9,8 +9,14 @@ apical4_none*/
 apical4_none*/**
 wandb/
 __pycache__/
-odg.md
+TODO.md
 outputs/
 outputs/**
 fix_apical4/**
 apical4_bw/**
+.gitconfig
+.ssh
+.cache
+.dotnet
+.vscode-server
+.bash_history

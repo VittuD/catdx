@@ -5,16 +5,13 @@ from transformers import VivitImageProcessor, TrainerCallback
 import torchvision.transforms.functional as F
 from PIL import Image
 import cv2
-from decord import VideoReader
 import os
 import pandas as pd
 from datasets import Dataset, Features, Value, Video, DatasetDict
-import datasets
 
-VivitImageProcessor()
 
 def get_image_processor(resize_to, num_channels):
-    # Generate a list with num_channels times elements 0.5
+    # Generate a list with num_channels times elements (Imagenet standard normalization)
     image_mean = [0.5] * num_channels
     image_std = [0.5] * num_channels
 
@@ -22,12 +19,14 @@ def get_image_processor(resize_to, num_channels):
         do_resize=True,
         size={'height': resize_to, 'width': resize_to},
         do_center_crop=False,
-        do_normalize=True,
+        do_normalize=False,
+        do_rescale=False,
+        offset=False,
         image_mean=image_mean,
         image_std=image_std,
     )
 
-# Dataset Utilities
+## Dataset Utilities
 def create_datasets(csv_file, video_folder):
         df = pd.read_csv(csv_file)
         df["file_name"] = df["file_name"].apply(lambda x: os.path.abspath(os.path.join(video_folder, x)))
@@ -43,11 +42,16 @@ def create_datasets(csv_file, video_folder):
         val_dataset = dataset.filter(lambda x: x["partition"] == "val")
         test_dataset = dataset.filter(lambda x: x["partition"] == "test")
         
-        return DatasetDict({
+        
+        datadict = DatasetDict({
             "train": train_dataset,
             "validation": val_dataset,
             "test": test_dataset,
         })
+
+        # datadict.save_to_disk("saved_hf_dataset", max_shard_size="1GB")
+        
+        return datadict
 
 def load_dataset(dataset_folder, augmentation=None):
     # Augmentation not implemented yet
@@ -63,38 +67,76 @@ def load_dataset(dataset_folder, augmentation=None):
     dataset = dataset.rename_column('CO', 'labels')
     return dataset
 
+
+## Video/Batch Processing Utilities
 def collate_fn(examples, image_processor, num_channels):
-    pixel_values = torch.stack([preprocess_example(example, image_processor, num_channels).squeeze(0) for example in examples])
+    pixel_values = torch.stack([
+        preprocess_example(example, image_processor, num_channels).squeeze(0)
+        for example in examples
+    ])
     labels = torch.tensor([example["labels"] for example in examples])
     return {"pixel_values": pixel_values, "labels": labels}
 
-def convert_to_grayscale(video_frames):
-    # Convert each frame from RGB to grayscale (luminance only)
-    return [Image.fromarray(frame).convert("L") for frame in video_frames]
-
 def preprocess_example(example, image_processor, num_channels=1, num_frames=32):
+    # NEW Huggingface release: video is a torchvision VideoReader object
     video = example['pixel_values']
-    original_frames = [frame.asnumpy() for frame in video]
+    
+    # Convert video frames to NumPy arrays using the as_numpy helper
+    original_frames = as_numpy(video)
+    
     if num_channels == 1:
         original_frames = convert_to_grayscale(original_frames)
-        original_frames = [np.array(frame)[..., None] for frame in original_frames]
-    frames = original_frames
-    # Save the video back as mp4 with cv2 for manual sanity check
-    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    # out = cv2.VideoWriter('original.mp4', fourcc, 30, (frames[0].shape[1], frames[0].shape[0]))
-    # for frame in frames:
-    #     out.write(frame)
-    # out.release()
     
-    if len(frames) < num_frames:
-        frames = frames * (num_frames // len(frames)) + frames[:num_frames % len(frames)]
-    else:
-        frames = frames[:num_frames]
+    frames = original_frames
+    
+    # Adjust the number of frames to match num_frames (pad or truncate as needed)
+    frames = adjust_frames(frames, num_frames)
+
+    # Normalize from [0, 255] to [0, 1]
+    frames = [frame / 255.0 for frame in frames]
     
     processed_video = image_processor(frames, return_tensors='pt')
     return processed_video['pixel_values']
 
-# Metric Computation Utilities
+def as_numpy(video):
+    frames = []
+    for frame in video:
+        tensor_frame = frame['data']
+        if tensor_frame.device.type != "cpu":
+            tensor_frame = tensor_frame.cpu()
+        # Convert tensor to NumPy array immediately
+        frames.append(tensor_frame.numpy())
+    return frames
+
+def convert_to_grayscale(video_frames):
+    # video_frames is now a list of NumPy arrays.
+    grayscale_frames = []
+    for frame in video_frames:
+        # If the frame has one channel, remove it to get a 2D array; otherwise, transpose to get [height, width, channels]
+        if frame.shape[0] == 1:
+            frame = frame.squeeze(0)
+        else:
+            frame = np.transpose(frame, (1, 2, 0))
+        image = Image.fromarray(frame)
+        grayscale_image = image.convert("L")
+        # Undo the conversion: convert the PIL grayscale image back to a NumPy array
+        np_frame = np.array(grayscale_image)
+        # Transpose back by adding a channel dimension to form [channels, height, width]
+        np_frame = np_frame[np.newaxis, ...]
+        
+        grayscale_frames.append(np_frame)
+    return grayscale_frames
+
+def adjust_frames(frames, num_frames):
+    # Adjust the number of frames to match num_frames (pad or truncate as needed)
+    if len(frames) < num_frames:
+        frames = frames * (num_frames // len(frames)) + frames[:num_frames % len(frames)]
+    else:
+        frames = frames[:num_frames]
+    return frames
+
+
+## Metric Computation Utilities
 def compute_mae(predictions, labels):
     return torch.mean(torch.abs(predictions - labels)).item()
 

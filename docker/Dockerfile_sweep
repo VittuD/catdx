@@ -1,13 +1,6 @@
 # Dockerfile.dev
 FROM eidos-service.di.unito.it/vitturini/vivit:base
 
-# Copy the requirements file first (if needed to leverage Docker cache)
-COPY requirements.txt /workspace/requirements.txt
-
-# (Optional) Reinstall dependencies if they’re not already installed in the base image.
-# RUN pip install --no-cache-dir -r /workspace/requirements.txt
-
-## TODO this also push the datasets to the container, suboptimal
 # Copy the entire project directory into the container
 COPY . /workspace
 

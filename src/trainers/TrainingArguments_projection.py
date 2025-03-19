@@ -21,6 +21,8 @@ class TrainingArguments_projection(TrainingArguments):
     contrastive_sigma: float = field(default=1.0, metadata={"help": "Sigma value for contrastive learning."})
     training_mode: str = field(default="regression", metadata={"help": "Training mode to be used."})
     dataset_folder: str = field(default="dataset", metadata={"help": "Folder name of the dataset."})
+    contrastive_method: str = field(default="supcon", metadata={"help": "Contrastive method to be used."})
+    is_unsupervised: bool = field(default=False, metadata={"help": "Whether the training is unsupervised."})
 
     def pop_attribute(self, attribute, default=None):
         """
