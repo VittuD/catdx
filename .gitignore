@@ -20,3 +20,4 @@ apical4_bw/**
 .dotnet
 .vscode-server
 .bash_history
+.netrc
