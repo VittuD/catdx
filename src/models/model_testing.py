@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import torch
 
 # Function to perform inference and collect predictions for each partition
 def perform_inference(dataset, splits, trainer):
@@ -14,8 +15,9 @@ def perform_inference(dataset, splits, trainer):
             print(f"Skipping {split} partition since it does not exist in the dataset.")
             continue  # Skip this partition if it doesn't exist
         print(f"Processing {split} partition...")
-
+        
         # Use the trainer predict method to get predictions on the split
+        # TODO use trainer evaluate to avoid OOM (not keeping gradients)
         predictions = trainer.predict(dataset[split])
         actual_labels = predictions.label_ids
         predicted_labels = predictions.predictions[0] if isinstance(predictions.predictions, tuple) else predictions.predictions
@@ -28,6 +30,9 @@ def perform_inference(dataset, splits, trainer):
             })
 
         print(f"Predictions for {split} partition completed.")
+
+        # Clear cuda cache
+        torch.cuda.empty_cache()
 
     return results
 

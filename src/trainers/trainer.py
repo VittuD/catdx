@@ -13,11 +13,10 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# TODO only 1 forward with bsz*2 and then torch split
-# TODO if unsupervised pass labels,kernel = None and method = 'yaware'
+# TODO if image is already grayscale, skip the ToGray augmentation
 
 class LogTrainer(Trainer):
-        
+
     def __init__(self,
                 model: Union[PreTrainedModel, nn.Module] = None,
                 args: TrainingArguments_projection = None,
@@ -29,6 +28,12 @@ class LogTrainer(Trainer):
         self.contrastive_sigma = args.contrastive_sigma
         self.contrastive_method = args.contrastive_method
         self.is_unsupervised = args.is_unsupervised
+
+        # If is_unsupervised, set kernel to None and contrast method to supcon and print it as warning
+        if self.is_unsupervised:
+            self.kernel_type = "none"
+            self.contrastive_method = "supcon"
+            print("Warning: Unsupervised training. Setting kernel to None and contrastive method to SupCon.")
 
         model.set_training_mode(self.training_mode)
 
@@ -42,8 +47,6 @@ class LogTrainer(Trainer):
         self.label_names+=['labels']
         self.epoch_wise_predictions = torch.tensor([])
         self.epoch_wise_labels = torch.tensor([])
-        # if hasattr(self.model, 'set_training_mode'):
-        #     self.model.set_training_mode(self.training_mode)
 
     def log(self, logs, start_time='NaN'):
         logs["learning_rate"] = self._get_learning_rate()
@@ -83,34 +86,34 @@ class LogTrainer(Trainer):
             loss (and optionally model outputs)
         """
         labels = inputs.pop("labels")
-        outputs = model(**inputs)
-        features = outputs.get("projections")
 
         if self.is_unsupervised:
-            outputs, features, labels = self._process_unsupervised(model, inputs, num_items_in_batch, features)
+            inputs, labels = self._process_unsupervised(inputs, num_items_in_batch, labels)
+
+        outputs = model(**inputs)
+        features = outputs.get("projections")
 
         loss = self._compute_loss(outputs, features, labels, model)
         self._log_epoch_wise_predictions(outputs, labels)
 
         return (loss, outputs) if return_outputs else loss
 
-    def _process_unsupervised(self, model, inputs, num_items_in_batch, features):
+    def _process_unsupervised(self, inputs, num_items_in_batch, labels):
         """
-        Process unsupervised training by augmenting the inputs and combining features.
-
+        Process unsupervised training by augmenting the inputs and adding them to the batch.
         Returns:
-            outputs: the model outputs for the augmented inputs
+            outputs: a batch with the original and augmented inputs
             features: combined features tensor with shape [bsz, n_views, n_features]
             labels: set to None for unsupervised learning
         """
         augmented_inputs = self._augment_inputs(inputs, num_items_in_batch)
-        augmented_outputs = model(**augmented_inputs)
-        augmented_features = augmented_outputs.get("projections")
 
-        # Concatenate original and augmented features to create two views per sample
-        features = torch.cat((features.unsqueeze(1), augmented_features.unsqueeze(1)), dim=1)
+        # Add the augmented inputs to the batch so that we get a tensor of shape [bsz*2, ...]
+        for key, value in augmented_inputs.items():
+            inputs[key] = torch.cat((inputs[key], value), dim=0)
+
         labels = None
-        return augmented_outputs, features, labels
+        return inputs, labels
     
     def _get_names(self, obj, scope):
         # Returns a list of variable names in the provided scope that refer to obj.
@@ -162,12 +165,18 @@ class LogTrainer(Trainer):
         Returns:
              The augmented frame as a numpy array.
         """
-        # It's bc albumentation accept normalize to either uint8 images: [0, 255] or float32 images: [0, 1]
-        transform = A.Compose([
-            A.ToGray(always_apply=True),
+        # If the frame is already grayscale, skip the ToGray augmentation
+        if frame.shape[2] == 1:
+            transform_list = []
+        else:
+            transform_list = [A.ToGray(always_apply=True)]
+
+        transform_list.extend([
+            A.InvertImg(p=0.5),
             A.RandomBrightnessContrast(p=1, brightness_limit=0.25, contrast_limit=0.25),
             A.RandomResizedCrop(size=(frame.shape[0], frame.shape[1]), scale=(0.6, 0.9)),
         ])
+        transform = A.Compose(transform_list)
         augmented = transform(image=frame)
         return augmented['image']
 
@@ -194,6 +203,12 @@ class LogTrainer(Trainer):
             # If no additional views are present, add a singleton dimension
             if features.dim() == 2:
                 features = features.unsqueeze(1)
+            # If unsupervised, split the features tensor into two views
+            if self.is_unsupervised:
+                bsz = features.size(0) // 2
+                # Split the features tensor into two views
+                views = torch.split(features, bsz, dim=0)
+                features = torch.cat(views, dim=1)
             return kernelized_supcon_loss(
                 features=features,  # Expected shape: [bsz, n_views, n_features]
                 labels=labels,

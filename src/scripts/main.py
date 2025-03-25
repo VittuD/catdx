@@ -6,13 +6,13 @@ import wandb
 from src.models.model_testing import run_inference_and_save
 from src.scripts.prediction_analysis import generate_predictions_report
 import torch
-from transformers import VivitConfig, HfArgumentParser
+from transformers import VivitConfig, HfArgumentParser, TrainerCallback
 from src.trainers.TrainingArguments_projection import TrainingArguments_projection
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from src.config.hydra_config import update_experiment_name, write_configs_to_json
 
-@hydra.main(config_path="configs", config_name="config")
+@hydra.main(config_path="configs", config_name="config", version_base="1.1")
 def main(cfg: DictConfig):
     # Check if CUDA is available
     if torch.cuda.is_available():
@@ -58,7 +58,9 @@ def main(cfg: DictConfig):
     image_processor = get_image_processor(vivit_config.image_size, cfg.model_config.num_channels)
     
     # Set wandb project
-    os.environ["WANDB_PROJECT"] = f"catdx_{cfg.trainer_config.dataset_folder}"
+    # Sanitize the project name by using only the substring after the last '/'
+    project_name = cfg.trainer_config.dataset_folder.split('/')[-1]
+    os.environ["WANDB_PROJECT"] = f"catdx_{project_name}"
 
     # Load model
     model = load_model(vivit_config=vivit_config, is_pretrained=True)
@@ -70,6 +72,12 @@ def main(cfg: DictConfig):
     parser = HfArgumentParser(TrainingArguments_projection)
     training_args, = parser.parse_json_file(json_file=trainer_json, allow_extra_keys=True)
 
+    class EmptyCacheCallback(TrainerCallback):
+        def on_step_end(self, args, state, control, **kwargs):
+            torch.cuda.empty_cache()
+            step = state.global_step
+            # print("✅ Emptied CUDA cache at the end of step ", step)
+
     # Create Trainer
     trainer = LogTrainer(
         model,
@@ -77,6 +85,7 @@ def main(cfg: DictConfig):
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
         data_collator = lambda examples: collate_fn(examples, image_processor, cfg.model_config.num_channels),
+        # callbacks=[EmptyCacheCallback()]
     )
 
     # Train the model
@@ -85,17 +94,18 @@ def main(cfg: DictConfig):
     # Save the model
     model.save_pretrained(cfg.experiment_name)
 
-    # Run inference and save results
-    results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=cfg.experiment_name)
+    # Run inference and save results only if training mode contains regression
+    if 'regression' in cfg.trainer_config.training_mode:
+        results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=cfg.experiment_name)
 
-    # Generate predictions report
-    pdf_files = []
-    for result in results:
-        pdf_files.append(generate_predictions_report(result))
+        # Generate predictions report
+        pdf_files = []
+        for result in results:
+            pdf_files.append(generate_predictions_report(result))
 
-    # Log each PDF file to wandb as its own artifact with a dynamically extracted alias
-    for pdf_file in pdf_files:
-        wandb.save(pdf_file)
+        # Log each PDF file to wandb as its own artifact with a dynamically extracted alias
+        for pdf_file in pdf_files:
+            wandb.save(pdf_file)
 
 
 if __name__ == '__main__':

@@ -81,6 +81,8 @@ def kernelized_supcon_loss(
         elif kernel_type == 'cauchy':
             def kernel_fn(labels):
                 return cauchy_kernel(labels, sigma=sigma)
+        elif kernel_type == 'none':
+            kernel_fn = None
         else:
             raise ValueError(f"Unsupported kernel_type: {kernel_type}")
         kernel = kernel_fn

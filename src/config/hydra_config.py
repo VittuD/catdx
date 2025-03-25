@@ -2,6 +2,22 @@ import os
 import json
 from omegaconf import DictConfig, OmegaConf
 
+def update_experiment_name(cfg: DictConfig, base_dir="."):
+    """
+    Update the trainer's experiment_name field if it's set to "auto" using the auto naming logic.
+    
+    Parameters:
+        cfg (DictConfig): The Hydra configuration object containing both 'trainer_config'
+                          and 'model_config'.
+        base_dir (str): The directory in which to search for existing run names.
+    
+    Returns:
+        The updated configuration with the new experiment_name.
+    """
+    if cfg.experiment_name == "auto":
+        cfg.experiment_name = auto_name_from_yaml(cfg, base_dir=base_dir)
+    return cfg
+
 def auto_name_from_yaml(cfg: DictConfig, base_dir="."):
     """
     Generate an auto run name using the training_mode and image_size from model_config.
@@ -20,9 +36,20 @@ def auto_name_from_yaml(cfg: DictConfig, base_dir="."):
     Returns:
         A string with the generated run name.
     """
-    # Ensure required model config fields exist.
-    if not (cfg.trainer_config or cfg.model_config) or "training_mode" not in cfg.trainer_config or "image_size" not in cfg.model_config:
-        raise ValueError("model_config must include 'training_mode' and 'image_size' for auto naming.")
+    # Ensure required configuration fields exist.
+    if not (cfg.trainer_config and cfg.model_config):
+        raise ValueError("Both 'trainer_config' and 'model_config' are required for auto naming.")
+
+    missing_keys = []
+    if "training_mode" not in cfg.trainer_config:
+        missing_keys.append("training_mode in trainer_config")
+    if "is_unsupervised" not in cfg.trainer_config:
+        missing_keys.append("is_unsupervised in model_config")
+    if "image_size" not in cfg.model_config:
+        missing_keys.append("image_size in model_config")
+    
+    if missing_keys:
+        raise ValueError("Missing required keys: " + ", ".join(missing_keys))
     
     training_mode = cfg.trainer_config.training_mode
     # Map verbose training modes to shorter acronyms.
@@ -33,6 +60,7 @@ def auto_name_from_yaml(cfg: DictConfig, base_dir="."):
         'end_to_end_contrastive': 'cone2e',
     }
     short_mode = mode_map.get(training_mode, training_mode)
+    short_mode += "unsup" if cfg.trainer_config.is_unsupervised else ""
     image_size = cfg.model_config.image_size
     learning_rate = repr(cfg.trainer_config.learning_rate)
     contrastive_sigma = repr(cfg.trainer_config.contrastive_sigma)
@@ -54,22 +82,6 @@ def auto_name_from_yaml(cfg: DictConfig, base_dir="."):
                 continue
 
     return f"{base_name}{max_suffix + 1}"
-
-def update_experiment_name(cfg: DictConfig, base_dir="."):
-    """
-    Update the trainer's experiment_name field if it's set to "auto" using the auto naming logic.
-    
-    Parameters:
-        cfg (DictConfig): The Hydra configuration object containing both 'trainer_config'
-                          and 'model_config'.
-        base_dir (str): The directory in which to search for existing run names.
-    
-    Returns:
-        The updated configuration with the new experiment_name.
-    """
-    if cfg.experiment_name == "auto":
-        cfg.experiment_name = auto_name_from_yaml(cfg, base_dir=base_dir)
-    return cfg
 
 def write_configs_to_json(cfg: DictConfig,
                           experiment_dir: str,

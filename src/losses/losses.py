@@ -7,6 +7,63 @@ from cmath import isinf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
+
+import wandb
+import numpy as np
+import matplotlib.pyplot as plt
+
+# DEBUG ONLY
+# TODO fix the range from -1 to 1
+def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="matrix_heatmap", columns=None):
+    """
+    Creates a wandb.Table from the provided data and logs it.
+    Also creates a heatmap from the data using matplotlib, places the x-axis legend on top,
+    and logs the figure.
+
+    Args:
+        data (list or numpy array): 2D data (e.g., a matrix) to create the table and heatmap from.
+        key_table (str, optional): The key under which to log the table. Defaults to "logged_table".
+        key_heatmap (str, optional): The key under which to log the heatmap. Defaults to "matrix_heatmap".
+        columns (list, optional): List of column names. If not provided, columns will be auto-generated.
+    """
+    # Convert numpy array to list if needed.
+    if isinstance(data, np.ndarray):
+        data_list = data.tolist()
+    else:
+        data_list = data
+
+    # Auto-generate column names if not provided.
+    if columns is None:
+        if data_list and isinstance(data_list[0], list):
+            num_cols = len(data_list[0])
+        else:
+            # Handle 1D data by converting it to a column vector.
+            data_list = [[item] for item in data_list]
+            num_cols = 1
+        columns = [f"col_{i}" for i in range(num_cols)]
+    
+    # Create and log the table.
+    table = wandb.Table(data=data_list, columns=columns)
+    wandb.log({key_table: table})
+    
+    # Create a heatmap using matplotlib.
+    fig, ax = plt.subplots()
+    # Convert the data to a numpy array for imshow.
+    heatmap_data = np.array(data_list)
+    cax = ax.imshow(heatmap_data, cmap='viridis')
+    fig.colorbar(cax)
+    ax.set_title("Heatmap")
+    
+    # Move x-axis ticks and labels to the top.
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position('top')
+    
+    # Log the heatmap figure.
+    wandb.log({key_heatmap: fig})
+    
+    # Close the figure to free memory.
+    plt.close(fig)
 
 
 class KernelizedSupCon(nn.Module):
@@ -101,9 +158,19 @@ class KernelizedSupCon(nn.Module):
             self.temperature
         )
 
+        # Log anchor_dot_contrast matrix on wandb on current step
+        # if wandb.run is not None:
+        #     log_data_as_table_and_heatmap(anchor_dot_contrast.cpu().detach().numpy(), key_table="anchor_dot_contrast_matrix"
+        #     "step_" + str(wandb.run.step))
+
         # for numerical stability
         logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
         logits = anchor_dot_contrast - logits_max.detach()
+
+        # Log logits matrix on wandb on current step
+        if wandb.run is not None:
+            log_data_as_table_and_heatmap(logits.cpu().detach().numpy(), key_table="logits_matrix"
+            "step_" + str(wandb.run.step))
 
         alignment = logits 
 
@@ -132,6 +199,10 @@ class KernelizedSupCon(nn.Module):
 
         uniformity = torch.log(uniformity.sum(1, keepdim=True))
 
+        # Log uniformity matrix on wandb on current step
+        # if wandb.run is not None:
+        #     log_data_as_table(uniformity.cpu().detach().numpy(), key="uniformity_matrix"
+        #     "step_" + str(wandb.run.step))
 
         # positive mask contains the anchor-positive pairs
         # excluding <self,self> on the diagonal
