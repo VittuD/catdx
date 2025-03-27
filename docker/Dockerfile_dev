@@ -1,8 +1,8 @@
 FROM eidos-service.di.unito.it/vitturini/vivit:base
-
+# TODO maybe do not switch user by default
 # Create a dev user with your specific UID (e.g., 1030)
 RUN useradd -m -u 1030 devuser && \
-    mkdir /scratch/catdx && \
+    mkdir -p /scratch/catdx && \
     chown -R devuser:devuser /scratch/catdx
 
 # Switch to the new user by default

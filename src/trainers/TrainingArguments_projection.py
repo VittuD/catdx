@@ -23,6 +23,7 @@ class TrainingArguments_projection(TrainingArguments):
     dataset_folder: str = field(default="dataset", metadata={"help": "Folder name of the dataset."})
     contrastive_method: str = field(default="supcon", metadata={"help": "Contrastive method to be used."})
     is_unsupervised: bool = field(default=False, metadata={"help": "Whether the training is unsupervised."})
+    gather_loss: bool = field(default=False, metadata={"help": "Whether to gather predictions before computing the loss. (Works for multiple GPUs setup)"})
 
     def pop_attribute(self, attribute, default=None):
         """

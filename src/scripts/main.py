@@ -12,20 +12,25 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from src.config.hydra_config import update_experiment_name, write_configs_to_json
 
+from accelerate import Accelerator
+
+
 @hydra.main(config_path="configs", config_name="config", version_base="1.1")
 def main(cfg: DictConfig):
-    # Check if CUDA is available
-    if torch.cuda.is_available():
+    # Set device variable to use GPU if available
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    if device.type == 'cuda':
         # Get the number of GPUs
         num_gpus = torch.cuda.device_count()
-        print(f'Number of GPUs available: {num_gpus}')
-
+        print(f'Using GPU. Number of GPUs available: {num_gpus}')
+        
         # List all available GPUs
         for i in range(num_gpus):
             gpu_name = torch.cuda.get_device_name(i)
             print(f'GPU {i}: {gpu_name}')
     else:
-        print('CUDA is not available. No GPUs detected.')
+        print('CUDA is not available. Using CPU.')
 
     # Update the run name if necessary.
     base_dir = os.getcwd()
@@ -64,8 +69,7 @@ def main(cfg: DictConfig):
 
     # Load model
     model = load_model(vivit_config=vivit_config, is_pretrained=True)
-    model.to('cuda')
-
+    model.to(device)
     print(model)
     
     # Training arguments
@@ -76,7 +80,6 @@ def main(cfg: DictConfig):
         def on_step_end(self, args, state, control, **kwargs):
             torch.cuda.empty_cache()
             step = state.global_step
-            # print("✅ Emptied CUDA cache at the end of step ", step)
 
     # Create Trainer
     trainer = LogTrainer(
@@ -88,8 +91,17 @@ def main(cfg: DictConfig):
         # callbacks=[EmptyCacheCallback()]
     )
 
+    if cfg.trainer_config.gather_loss:
+        accelerator = Accelerator()
+        model, trainer = accelerator.prepare(model, trainer)
+
     # Train the model
     trainer.train(resume_from_checkpoint=trainer.args.resume_from_checkpoint)
+
+    if cfg.trainer_config.gather_loss:
+        # Save the model using accelerator.unwrap_model.
+        accelerator.wait_for_everyone()  # Ensure all processes are synced.
+        model = accelerator.unwrap_model(model)
 
     # Save the model
     model.save_pretrained(cfg.experiment_name)

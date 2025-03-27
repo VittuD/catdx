@@ -13,7 +13,6 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# TODO if image is already grayscale, skip the ToGray augmentation
 
 class LogTrainer(Trainer):
 
@@ -28,6 +27,7 @@ class LogTrainer(Trainer):
         self.contrastive_sigma = args.contrastive_sigma
         self.contrastive_method = args.contrastive_method
         self.is_unsupervised = args.is_unsupervised
+        self.gather_loss = args.gather_loss
 
         # If is_unsupervised, set kernel to None and contrast method to supcon and print it as warning
         if self.is_unsupervised:
@@ -92,6 +92,10 @@ class LogTrainer(Trainer):
 
         outputs = model(**inputs)
         features = outputs.get("projections")
+        
+        
+        if self.gather_loss:
+            features, labels = self._gather_features_labels(features, labels)
 
         loss = self._compute_loss(outputs, features, labels, model)
         self._log_epoch_wise_predictions(outputs, labels)
@@ -115,6 +119,48 @@ class LogTrainer(Trainer):
         labels = None
         return inputs, labels
     
+    def _gather_features_labels(self, features, labels):
+        num_proc = self.accelerator.num_processes
+        # Gather features from all devices.
+        gathered_features = self.accelerator.gather(features)
+        gathered_features = self._reorder_augmented_tensor(gathered_features, num_proc)
+        if labels is not None:
+            gathered_labels = self.accelerator.gather(labels)
+            gathered_labels = self._reorder_augmented_tensor(gathered_labels, num_proc)
+        else:
+            gathered_labels = None
+        return gathered_features, gathered_labels
+    
+    def _reorder_augmented_tensor(self, features: torch.Tensor, num_proc: int) -> torch.Tensor:
+        """
+        Reorders a gathered features tensor from a multi-GPU SimCLR model.
+
+        Input: Tensor of shape [global_bsz, f_num] where global_bsz = bsz * num_proc.
+        For each GPU's batch (size bsz), the first half are originals and the second half are augmentations.
+
+        Returns:
+            torch.Tensor: Reordered tensor with originals first and augmentations second.
+        """
+        global_bsz, f_num = features.shape
+        local_bsz = global_bsz // num_proc  # local batch size on each GPU (must be even)
+        half = local_bsz // 2
+
+        # Reshape to [num_proc, local_bsz, f_num] to separate contributions from each GPU.
+        features = features.view(num_proc, local_bsz, f_num)
+
+        # Split each local batch into originals and augmented views.
+        orig = features[:, :half, :]  # originals: [num_proc, bsz/2, f_num]
+        aug = features[:, half:, :]   # augmented: [num_proc, bsz/2, f_num]
+
+        # Flatten the GPU/process dimension.
+        orig = orig.reshape(-1, f_num)  # shape: [global_bsz/2, f_num]
+        aug = aug.reshape(-1, f_num)    # shape: [global_bsz/2, f_num]
+
+        # Concatenate the two parts along the first dimension.
+        features_out = torch.cat([orig, aug], dim=0)  # final shape: [global_bsz, f_num]
+
+        return features_out
+
     def _get_names(self, obj, scope):
         # Returns a list of variable names in the provided scope that refer to obj.
         return [name for name, value in scope.items() if value is obj]
@@ -175,6 +221,7 @@ class LogTrainer(Trainer):
             A.InvertImg(p=0.5),
             A.RandomBrightnessContrast(p=1, brightness_limit=0.25, contrast_limit=0.25),
             A.RandomResizedCrop(size=(frame.shape[0], frame.shape[1]), scale=(0.6, 0.9)),
+            A.Erasing(scale=(0.1, 0.4), ratio=(0.3, 3.3), fill_value=[0], p=1.0)
         ])
         transform = A.Compose(transform_list)
         augmented = transform(image=frame)
@@ -193,7 +240,12 @@ class LogTrainer(Trainer):
         Returns:
              The computed loss.
         """
-        use_mse = features is None or 'regression' in model.training_mode
+        # Workaround for DDP model wrapper
+        training_mode = getattr(model, 'training_mode', None)
+        if training_mode is None and hasattr(model, 'module'):
+            training_mode = getattr(model.module, 'training_mode', '')
+
+        use_mse = features is None or ('regression' in training_mode)
         if features is None:
             print("Warning: 'projections' not found. Defaulting to regression (MSE loss), which may be unintended.")
 

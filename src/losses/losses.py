@@ -14,7 +14,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # DEBUG ONLY
-# TODO fix the range from -1 to 1
 def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="matrix_heatmap", columns=None):
     """
     Creates a wandb.Table from the provided data and logs it.
@@ -44,14 +43,15 @@ def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="m
         columns = [f"col_{i}" for i in range(num_cols)]
     
     # Create and log the table.
-    table = wandb.Table(data=data_list, columns=columns)
-    wandb.log({key_table: table})
+    # table = wandb.Table(data=data_list, columns=columns)
+    # wandb.log({key_table: table})
     
     # Create a heatmap using matplotlib.
     fig, ax = plt.subplots()
     # Convert the data to a numpy array for imshow.
     heatmap_data = np.array(data_list)
-    cax = ax.imshow(heatmap_data, cmap='viridis')
+    # Fix the range of the plot from 0 to -1
+    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-1, vmax=0)
     fig.colorbar(cax)
     ax.set_title("Heatmap")
     
@@ -157,11 +157,6 @@ class KernelizedSupCon(nn.Module):
             torch.matmul(features, features.T),
             self.temperature
         )
-
-        # Log anchor_dot_contrast matrix on wandb on current step
-        # if wandb.run is not None:
-        #     log_data_as_table_and_heatmap(anchor_dot_contrast.cpu().detach().numpy(), key_table="anchor_dot_contrast_matrix"
-        #     "step_" + str(wandb.run.step))
 
         # for numerical stability
         logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)

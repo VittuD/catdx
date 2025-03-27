@@ -23,3 +23,20 @@ The config file is a json file that contains the following fields:
 - save_strategy: defaults to epoch, refer to huggingface documentation
 - eval_strategy: defaults to epoch, refer to huggingface documentation
 - report_to: defaults to wandb, refer to huggingface documentation
+
+
+To run the script use the Dockerfile_python with the submit wrapper.
+e.g.
+```bash
+submit --name vivit-unsup --gpus 1 --mount $(pwd):/workspace  eidos-service.di.unito.it/vitturini/vivit:python
+```
+
+for the logs use:
+```bash
+docker service logs -f name_of_the_container
+```
+
+Devcontainer:
+```bash
+submit --name vivit-dev --gpus 2 --mount /mnt/fast-scratch/vitturini/catdx:/scratch/catdx eidos-service.di.unito.it/vitturini/vivit:dev
+```

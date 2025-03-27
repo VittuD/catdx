@@ -1,6 +1,6 @@
 .secrets
 .vscode/
-catdx/
+catdx_legacy/
 data/
 !src/data/
 catdx
