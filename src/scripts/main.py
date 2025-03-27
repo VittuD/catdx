@@ -9,17 +9,14 @@ import torch
 from transformers import VivitConfig, HfArgumentParser, TrainerCallback
 from src.trainers.TrainingArguments_projection import TrainingArguments_projection
 import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from src.config.hydra_config import update_experiment_name, write_configs_to_json
-
 from accelerate import Accelerator
 
+accelerator = Accelerator()
 
-@hydra.main(config_path="configs", config_name="config", version_base="1.1")
-def main(cfg: DictConfig):
-    # Set device variable to use GPU if available
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+@accelerator.on_main_process
+def print_gpus(device):
     if device.type == 'cuda':
         # Get the number of GPUs
         num_gpus = torch.cuda.device_count()
@@ -31,6 +28,34 @@ def main(cfg: DictConfig):
             print(f'GPU {i}: {gpu_name}')
     else:
         print('CUDA is not available. Using CPU.')
+
+@accelerator.on_main_process
+def wandb_start():
+    # Log to wandb, they key must be in the file .secrets
+    key = open('.secrets').read().strip()
+    wandb.login(key=key)
+
+@accelerator.on_main_process
+def run_inference(cfg, dataset, trainer):
+    results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=cfg.experiment_name)
+
+    # Generate predictions report
+    pdf_files = []
+    for result in results:
+        pdf_files.append(generate_predictions_report(result))
+    # Log each PDF file to wandb as its own artifact with a dynamically extracted alias
+    for pdf_file in pdf_files:
+        wandb.save(pdf_file)
+
+
+
+@hydra.main(config_path="configs", config_name="config", version_base="1.1")
+def main(cfg: DictConfig):
+    # Set device variable to use GPU if available
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # Print the available GPUs
+    print_gpus(device)
 
     # Update the run name if necessary.
     base_dir = os.getcwd()
@@ -44,8 +69,7 @@ def main(cfg: DictConfig):
     os.chdir('/scratch/catdx/')
 
     # Log to wandb, they key must be in the file .secrets
-    key = open('.secrets').read().strip()
-    wandb.login(key=key)
+    wandb_start()
 
     # Load dataset and image processor
     transforms = None
@@ -70,16 +94,10 @@ def main(cfg: DictConfig):
     # Load model
     model = load_model(vivit_config=vivit_config, is_pretrained=True)
     model.to(device)
-    print(model)
     
     # Training arguments
     parser = HfArgumentParser(TrainingArguments_projection)
     training_args, = parser.parse_json_file(json_file=trainer_json, allow_extra_keys=True)
-
-    class EmptyCacheCallback(TrainerCallback):
-        def on_step_end(self, args, state, control, **kwargs):
-            torch.cuda.empty_cache()
-            step = state.global_step
 
     # Create Trainer
     trainer = LogTrainer(
@@ -88,11 +106,9 @@ def main(cfg: DictConfig):
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
         data_collator = lambda examples: collate_fn(examples, image_processor, cfg.model_config.num_channels),
-        # callbacks=[EmptyCacheCallback()]
     )
 
     if cfg.trainer_config.gather_loss:
-        accelerator = Accelerator()
         model, trainer = accelerator.prepare(model, trainer)
 
     # Train the model
@@ -106,19 +122,12 @@ def main(cfg: DictConfig):
     # Save the model
     model.save_pretrained(cfg.experiment_name)
 
+    # Clear cuda cache
+    torch.cuda.empty_cache()
+
     # Run inference and save results only if training mode contains regression
     if 'regression' in cfg.trainer_config.training_mode:
-        results = run_inference_and_save(dataset=dataset, trainer=trainer, output_dir=cfg.experiment_name)
-
-        # Generate predictions report
-        pdf_files = []
-        for result in results:
-            pdf_files.append(generate_predictions_report(result))
-
-        # Log each PDF file to wandb as its own artifact with a dynamically extracted alias
-        for pdf_file in pdf_files:
-            wandb.save(pdf_file)
-
+        run_inference(cfg, dataset, trainer)
 
 if __name__ == '__main__':
     main()

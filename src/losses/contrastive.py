@@ -50,6 +50,9 @@ def kernelized_supcon_loss(
     contrast_mode: str = 'all',
     base_temperature: float = 0.07,
     delta_reduction: str = 'sum',
+    plot: bool = False,
+    accelerator=None,
+    epoch=None,
 ):
     """
     A wrapper to instantiate and call KernelizedSupCon with the chosen kernel
@@ -101,7 +104,7 @@ def kernelized_supcon_loss(
     normalized_features = F.normalize(features, dim=-1, p=2)
 
     # Forward pass
-    return loss_fn.forward(normalized_features, labels)
+    return loss_fn.forward(normalized_features, labels, plot, accelerator, epoch)
 
 
 # Plotting helper functions

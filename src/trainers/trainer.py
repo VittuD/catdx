@@ -44,18 +44,18 @@ class LogTrainer(Trainer):
 
         super().__init__(model=model, args=args, **kwargs)
 
-        self.label_names+=['labels']
+        self.label_names+=["labels"]
         self.epoch_wise_predictions = torch.tensor([])
         self.epoch_wise_labels = torch.tensor([])
 
-    def log(self, logs, start_time='NaN'):
+    def log(self, logs, start_time="NaN"):
         logs["learning_rate"] = self._get_learning_rate()
         logs["step"] = self.state.global_step
         # Add train/r2 data leveraging the batch_wise_predictions and batch_wise_labels
         if self.state.is_local_process_zero:
             if self.epoch_wise_predictions.numel() > 0 and self.epoch_wise_labels.numel() > 0:
-                # If logs has a key with 'eval' in it, set prefix to "eval_"
-                prefix = "eval_" if any('eval' in key for key in logs.keys()) else ""
+                # If logs has a key with "eval" in it, set prefix to "eval_"
+                prefix = "eval_" if any("eval" in key for key in logs.keys()) else ""
                 logs[f"{prefix}r2"] = compute_r2(self.epoch_wise_predictions, self.epoch_wise_labels)
                 logs[f"{prefix}pearson"] = float(pearsonr(self.epoch_wise_predictions, self.epoch_wise_labels)[0])
                 logs[f"{prefix}mae"] = compute_mae(self.epoch_wise_predictions, self.epoch_wise_labels)
@@ -66,7 +66,7 @@ class LogTrainer(Trainer):
         super().log(logs)
 
     def mse_loss(self, outputs, labels):
-        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs['logits'].squeeze())
+        predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs["logits"].squeeze())
         loss = torch.nn.functional.mse_loss(predictions, labels)
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
         self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
@@ -78,7 +78,7 @@ class LogTrainer(Trainer):
 
         Parameters:
             model: the neural network model
-            inputs: dictionary of input tensors (must include 'labels' and 'pixel_values')
+            inputs: dictionary of input tensors (must include "labels" and "pixel_values")
             num_items_in_batch: number of items in the batch to process for augmentation
             return_outputs: if True, returns a tuple (loss, outputs), else only loss
 
@@ -97,7 +97,13 @@ class LogTrainer(Trainer):
         if self.gather_loss:
             features, labels = self._gather_features_labels(features, labels)
 
-        loss = self._compute_loss(outputs, features, labels, model)
+        # plot is true if this is the first minibatch of the epoch and is main process
+        epoch = self.state.epoch % 1 == 0
+        is_main_process = self.accelerator.is_main_process
+        is_training = model.training 
+        plot = epoch and is_main_process and is_training
+
+        loss = self._compute_loss(outputs, features, labels, model, plot)
         self._log_epoch_wise_predictions(outputs, labels)
 
         return (loss, outputs) if return_outputs else loss
@@ -110,7 +116,9 @@ class LogTrainer(Trainer):
             features: combined features tensor with shape [bsz, n_views, n_features]
             labels: set to None for unsupervised learning
         """
+        # Augment both views
         augmented_inputs = self._augment_inputs(inputs, num_items_in_batch)
+        inputs = self._augment_inputs(inputs, num_items_in_batch)
 
         # Add the augmented inputs to the batch so that we get a tensor of shape [bsz*2, ...]
         for key, value in augmented_inputs.items():
@@ -136,7 +144,7 @@ class LogTrainer(Trainer):
         Reorders a gathered features tensor from a multi-GPU SimCLR model.
 
         Input: Tensor of shape [global_bsz, f_num] where global_bsz = bsz * num_proc.
-        For each GPU's batch (size bsz), the first half are originals and the second half are augmentations.
+        For each GPU"s batch (size bsz), the first half are originals and the second half are augmentations.
 
         Returns:
             torch.Tensor: Reordered tensor with originals first and augmentations second.
@@ -170,7 +178,7 @@ class LogTrainer(Trainer):
         Create an augmented version of the inputs for unsupervised learning.
 
         Parameters:
-             inputs: original input dictionary (expects 'pixel_values')
+             inputs: original input dictionary (expects "pixel_values")
              num_items_in_batch: number of items to augment
 
         Returns:
@@ -179,7 +187,7 @@ class LogTrainer(Trainer):
         augmented_inputs = {k: v.clone() for k, v in inputs.items()}
 
         for i in range(num_items_in_batch):
-            video = augmented_inputs['pixel_values'][i]
+            video = augmented_inputs["pixel_values"][i]
             transformed_frames = []
             for j in range(video.shape[0]):
                 # Convert frame from (C, H, W) to (H, W, C) numpy array
@@ -190,12 +198,12 @@ class LogTrainer(Trainer):
                 transformed_frames.append(aug_tensor)
 
                 # Save the image for manual sanity check
-                # original_filename = f'frame_{j}_original.png'
-                # augmented_filename = f'frame_{j}_augmented.png'
+                # original_filename = f"frame_{j}_original.png"
+                # augmented_filename = f"frame_{j}_augmented.png"
                 # self._debug_save_frame(frame, permute=False, eq_filename=original_filename)
                 # self._debug_save_frame(aug_frame, permute=False, eq_filename=augmented_filename)
 
-            augmented_inputs['pixel_values'][i] = torch.stack(transformed_frames)
+            augmented_inputs["pixel_values"][i] = torch.stack(transformed_frames)
         return augmented_inputs
 
     def _apply_augmentations(self, frame):
@@ -218,16 +226,15 @@ class LogTrainer(Trainer):
             transform_list = [A.ToGray(always_apply=True)]
 
         transform_list.extend([
-            A.InvertImg(p=0.5),
             A.RandomBrightnessContrast(p=1, brightness_limit=0.25, contrast_limit=0.25),
             A.RandomResizedCrop(size=(frame.shape[0], frame.shape[1]), scale=(0.6, 0.9)),
-            A.Erasing(scale=(0.1, 0.4), ratio=(0.3, 3.3), fill_value=[0], p=1.0)
+            A.Erasing(scale=(0.05, 0.1), ratio=(0.3, 3.3), p=1.0)
         ])
         transform = A.Compose(transform_list)
         augmented = transform(image=frame)
-        return augmented['image']
+        return augmented["image"]
 
-    def _compute_loss(self, outputs, features, labels, model):
+    def _compute_loss(self, outputs, features, labels, model, plot=False):
         """
         Compute the loss using either MSE or kernelized supervised contrastive loss.
 
@@ -241,11 +248,11 @@ class LogTrainer(Trainer):
              The computed loss.
         """
         # Workaround for DDP model wrapper
-        training_mode = getattr(model, 'training_mode', None)
-        if training_mode is None and hasattr(model, 'module'):
-            training_mode = getattr(model.module, 'training_mode', '')
+        training_mode = getattr(model, "training_mode", None)
+        if training_mode is None and hasattr(model, "module"):
+            training_mode = getattr(model.module, "training_mode", "")
 
-        use_mse = features is None or ('regression' in training_mode)
+        use_mse = features is None or ("regression" in training_mode)
         if features is None:
             print("Warning: 'projections' not found. Defaulting to regression (MSE loss), which may be unintended.")
 
@@ -268,9 +275,12 @@ class LogTrainer(Trainer):
                 temperature=0.07,
                 sigma=self.contrastive_sigma,
                 method=self.contrastive_method,                  
-                contrast_mode='all',
+                contrast_mode="all",
                 base_temperature=0.07,
-                delta_reduction='sum'
+                delta_reduction="sum",
+                plot=plot,
+                accelerator=self.accelerator,
+                epoch=self.state.epoch,
             )
 
     def _log_epoch_wise_predictions(self, outputs, labels):
@@ -281,7 +291,7 @@ class LogTrainer(Trainer):
              outputs: model outputs containing logits
              labels: ground truth labels
         """
-        predictions = outputs['logits'].squeeze()
+        predictions = outputs["logits"].squeeze()
         if predictions.dim() == 0:
             predictions = predictions.unsqueeze(0)
 
@@ -295,7 +305,7 @@ class LogTrainer(Trainer):
             (self.epoch_wise_labels, labels.detach().cpu())
         )
 
-    def _debug_save_frame(self, frame, permute=True, eq_filename='first_frame_eq.png', hist_filename='histogram.png'):
+    def _debug_save_frame(self, frame, permute=True, eq_filename="first_frame_eq.png", hist_filename="histogram.png"):
         """
         Processes a frame tensor by normalizing, applying histogram equalization,
         and saving both the equalized image and a histogram plot.
@@ -328,8 +338,8 @@ class LogTrainer(Trainer):
 
         # Save the histogram plot
         plt.hist(frame_norm.ravel(), bins=256, range=[0,255])
-        plt.title('Pixel Intensity Distribution')
-        plt.xlabel('Intensity')
-        plt.ylabel('Frequency')
+        plt.title("Pixel Intensity Distribution")
+        plt.xlabel("Intensity")
+        plt.ylabel("Frequency")
         plt.savefig(hist_filename)
         plt.close()

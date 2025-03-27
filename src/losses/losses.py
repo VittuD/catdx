@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # DEBUG ONLY
-def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="matrix_heatmap", columns=None):
+def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="matrix_heatmap", columns=None, epoch=None):
     """
     Creates a wandb.Table from the provided data and logs it.
     Also creates a heatmap from the data using matplotlib, places the x-axis legend on top,
@@ -51,9 +51,10 @@ def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="m
     # Convert the data to a numpy array for imshow.
     heatmap_data = np.array(data_list)
     # Fix the range of the plot from 0 to -1
-    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-1, vmax=0)
+    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-1.5, vmax=0)
     fig.colorbar(cax)
-    ax.set_title("Heatmap")
+    title = f"Heatmap Epoch {epoch}" if epoch is not None else "Heatmap"
+    ax.set_title(title)
     
     # Move x-axis ticks and labels to the top.
     ax.xaxis.tick_top()
@@ -96,7 +97,7 @@ class KernelizedSupCon(nn.Module):
                f'kernel={self.kernel is not None}, ' \
                f'delta_reduction={self.delta_reduction})'
 
-    def forward(self, features, labels=None):
+    def forward(self, features, labels=None, plot=False, accelerator=None, epoch=None):
         """Compute loss for model. If `labels` is None, 
         it degenerates to SimCLR unsupervised loss:
         https://arxiv.org/pdf/2002.05709.pdf
@@ -163,9 +164,9 @@ class KernelizedSupCon(nn.Module):
         logits = anchor_dot_contrast - logits_max.detach()
 
         # Log logits matrix on wandb on current step
-        if wandb.run is not None:
+        if (wandb.run is not None) and plot and accelerator.is_main_process:
             log_data_as_table_and_heatmap(logits.cpu().detach().numpy(), key_table="logits_matrix"
-            "step_" + str(wandb.run.step))
+            "step_" + str(wandb.run.step), epoch=epoch)
 
         alignment = logits 
 
