@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import wandb
 
-import wandb
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -51,7 +50,7 @@ def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="m
     # Convert the data to a numpy array for imshow.
     heatmap_data = np.array(data_list)
     # Fix the range of the plot from 0 to -1
-    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-1.5, vmax=0)
+    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-5, vmax=0)
     fig.colorbar(cax)
     title = f"Heatmap Epoch {epoch}" if epoch is not None else "Heatmap"
     ax.set_title(title)

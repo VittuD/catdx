@@ -1,5 +1,10 @@
 # Base Image for Vivit
 FROM eidos-service.di.unito.it/vitturini/vivit:base
 
+# Create /scratch/catdx 
+RUN mkdir -p /scratch/catdx
+
+WORKDIR /scratch/catdx
+
 # Set vscode as the entrypoint
 ENTRYPOINT ["accelerate", "launch", "-m" ,"src.scripts.main"]

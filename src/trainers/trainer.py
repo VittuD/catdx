@@ -12,6 +12,7 @@ import albumentations as A
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from src.trainers.DifferentiableAllGather import DifferentiableAllGather
 
 
 class LogTrainer(Trainer):
@@ -129,11 +130,11 @@ class LogTrainer(Trainer):
     
     def _gather_features_labels(self, features, labels):
         num_proc = self.accelerator.num_processes
-        # Gather features from all devices.
-        gathered_features = self.accelerator.gather(features)
+        # Use the custom differentiable gather for features.
+        gathered_features = DifferentiableAllGather.apply(features)
         gathered_features = self._reorder_augmented_tensor(gathered_features, num_proc)
         if labels is not None:
-            gathered_labels = self.accelerator.gather(labels)
+            gathered_labels = DifferentiableAllGather.apply(labels)
             gathered_labels = self._reorder_augmented_tensor(gathered_labels, num_proc)
         else:
             gathered_labels = None
@@ -168,10 +169,6 @@ class LogTrainer(Trainer):
         features_out = torch.cat([orig, aug], dim=0)  # final shape: [global_bsz, f_num]
 
         return features_out
-
-    def _get_names(self, obj, scope):
-        # Returns a list of variable names in the provided scope that refer to obj.
-        return [name for name, value in scope.items() if value is obj]
 
     def _augment_inputs(self, inputs, num_items_in_batch):
         """
