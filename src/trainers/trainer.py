@@ -2,11 +2,13 @@
 
 from typing import Union
 from src.trainers.TrainingArguments_projection import TrainingArguments_projection
-from transformers import Trainer, TrainingArguments, PreTrainedModel
+from transformers import Trainer, PreTrainedModel, Dataset, PredictionOutput
 from src.utils.utils import compute_r2, compute_mae, compute_std, compute_mse
 from scipy.stats import pearsonr
+from typing import Optional, List
 import torch
 from torch import nn
+from torch.optim.lr_scheduler import StepLR
 from src.losses.contrastive import kernelized_supcon_loss
 import albumentations as A
 import cv2
@@ -45,9 +47,39 @@ class LogTrainer(Trainer):
 
         super().__init__(model=model, args=args, **kwargs)
 
-        self.label_names+=["labels"]
+        # Call the post initialization method
+        self.__post_init__()
+
+    def __post_init__(self):
+        # Any additional initialization after the parent __init__ goes here
+        self.label_names += ["labels"]
         self.epoch_wise_predictions = torch.tensor([])
         self.epoch_wise_labels = torch.tensor([])
+
+    # Override the create_scheduler method to add custom scheduler
+    def create_scheduler(self, num_training_steps: int, optimizer=None):
+        optimizer = self.optimizer if optimizer is None else optimizer
+        
+        if self.args.lr_scheduler_type == "step":
+            try:
+                steps_per_epoch = len(self.train_dataset) // (
+                    self.args.per_device_train_batch_size * self.args.gradient_accumulation_steps
+                )
+            except TypeError:
+                steps_per_epoch = num_training_steps // self.args.num_train_epochs
+
+            # Get the step size in epochs from your extra kwargs
+            step_size_epochs = self.args.lr_scheduler_kwargs.get("step_size_epochs", 1)
+            step_size_steps = step_size_epochs * steps_per_epoch
+            gamma = self.args.lr_scheduler_kwargs.get("gamma", 0.1)
+            
+            self.lr_scheduler = StepLR(optimizer, step_size=step_size_steps, gamma=gamma)
+            self._created_lr_scheduler = True
+            return self.lr_scheduler
+        else:
+            return super().create_scheduler(num_training_steps, optimizer)
+
+
 
     def log(self, logs, start_time="NaN"):
         logs["learning_rate"] = self._get_learning_rate()
@@ -172,7 +204,9 @@ class LogTrainer(Trainer):
 
     def _augment_inputs(self, inputs, num_items_in_batch):
         """
-        Create an augmented version of the inputs for unsupervised learning.
+        Create an augmented version of the inputs for unsupervised learning,
+        where each video is augmented with a single set of random transformations
+        applied consistently across all frames.
 
         Parameters:
              inputs: original input dictionary (expects "pixel_values")
@@ -184,52 +218,74 @@ class LogTrainer(Trainer):
         augmented_inputs = {k: v.clone() for k, v in inputs.items()}
 
         for i in range(num_items_in_batch):
-            video = augmented_inputs["pixel_values"][i]
-            transformed_frames = []
-            for j in range(video.shape[0]):
-                # Convert frame from (C, H, W) to (H, W, C) numpy array
-                frame = video[j].permute(1, 2, 0).cpu().numpy()
-                aug_frame = self._apply_augmentations(frame)
-                # Convert back to torch tensor with shape (C, H, W)
-                aug_tensor = torch.tensor(aug_frame).permute(2, 0, 1)
-                transformed_frames.append(aug_tensor)
+            video = augmented_inputs["pixel_values"][i]  # shape: (T, C, H, W)
+            # Convert video tensor to numpy array with shape (T, H, W, C)
+            video_np = video.permute(0, 2, 3, 1).cpu().numpy()
 
-                # Save the image for manual sanity check
-                # original_filename = f"frame_{j}_original.png"
-                # augmented_filename = f"frame_{j}_augmented.png"
-                # self._debug_save_frame(frame, permute=False, eq_filename=original_filename)
-                # self._debug_save_frame(aug_frame, permute=False, eq_filename=augmented_filename)
+            # Apply the same augmentation to all frames using additional targets
+            aug_video_np = self._apply_augmentations(video_np)
 
-            augmented_inputs["pixel_values"][i] = torch.stack(transformed_frames)
+            # Convert back to torch tensor and update the inputs dictionary
+            aug_video_tensor = torch.stack(
+                [torch.tensor(frame).permute(2, 0, 1) for frame in aug_video_np]
+            )
+            augmented_inputs["pixel_values"][i] = aug_video_tensor
+
         return augmented_inputs
 
-    def _apply_augmentations(self, frame):
+    # TODO this might be saving/augmenting the same frame multiple times
+    def _apply_augmentations(self, video):
         """
-        Apply a series of augmentations to a single frame.
-
-        The transformations include converting to grayscale, applying random brightness/contrast,
-        and performing a random resized crop.
+        Apply a single set of augmentations to an entire video using Albumentations'
+        additional_targets functionality. The first frame is passed as the main 'image'
+        and the remaining frames are passed as additional targets, ensuring the same
+        random parameters are used for every frame.
 
         Parameters:
-             frame: numpy array of shape (H, W, C)
+             video: numpy array of shape (T, H, W, C)
 
         Returns:
-             The augmented frame as a numpy array.
+             The augmented video as a numpy array of shape (T, H, W, C)
         """
-        # If the frame is already grayscale, skip the ToGray augmentation
-        if frame.shape[2] == 1:
-            transform_list = []
-        else:
-            transform_list = [A.ToGray(always_apply=True)]
-
+        # Build the list of transformations.
+        transform_list = []
+        # If the frame is not already grayscale, convert it.
+        if video.shape[-1] != 1:
+            transform_list.append(A.ToGray(always_apply=True))
         transform_list.extend([
             A.RandomBrightnessContrast(p=1, brightness_limit=0.25, contrast_limit=0.25),
-            A.RandomResizedCrop(size=(frame.shape[0], frame.shape[1]), scale=(0.6, 0.9)),
+            A.RandomResizedCrop(size=(video.shape[1], video.shape[2]), scale=(0.6, 0.9)),
             A.Erasing(scale=(0.05, 0.1), ratio=(0.3, 3.3), p=1.0)
         ])
-        transform = A.Compose(transform_list)
-        augmented = transform(image=frame)
-        return augmented["image"]
+
+        # Prepare additional_targets: first frame is 'image', rest are 'image1', 'image2', etc.
+        additional_targets = {}
+        targets = {}
+        targets["image"] = video[0]
+        for idx in range(1, video.shape[0]):
+            # Save the image for manual sanity check
+            # original_filename = f"frame_{idx}_original.png"
+            # self._debug_save_frame(video[idx], permute=False, eq_filename=original_filename)
+            key = f"image{idx}"
+            additional_targets[key] = "image"
+            targets[key] = video[idx]
+
+        # Create the Compose transformation with additional_targets.
+        transform = A.Compose(transform_list, additional_targets=additional_targets)
+        transformed = transform(**targets)
+
+        # Gather augmented frames in order.
+        augmented_frames = [transformed["image"]]
+        for idx in range(1, video.shape[0]):
+            key = f"image{idx}"
+            # Save the image for manual sanity check
+            # augmented_filename = f"frame_{idx}_augmented.png"
+            # self._debug_save_frame(transformed[key], permute=False, eq_filename=augmented_filename)
+            augmented_frames.append(transformed[key])
+
+        return np.array(augmented_frames)
+
+
 
     def _compute_loss(self, outputs, features, labels, model, plot=False):
         """

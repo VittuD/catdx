@@ -42,15 +42,15 @@ def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="m
         columns = [f"col_{i}" for i in range(num_cols)]
     
     # Create and log the table.
-    # table = wandb.Table(data=data_list, columns=columns)
-    # wandb.log({key_table: table})
+    table = wandb.Table(data=data_list, columns=columns)
+    wandb.log({key_table: table})
     
     # Create a heatmap using matplotlib.
     fig, ax = plt.subplots()
     # Convert the data to a numpy array for imshow.
     heatmap_data = np.array(data_list)
     # Fix the range of the plot from 0 to -1
-    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-5, vmax=0)
+    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-3, vmax=0)
     fig.colorbar(cax)
     title = f"Heatmap Epoch {epoch}" if epoch is not None else "Heatmap"
     ax.set_title(title)

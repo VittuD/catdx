@@ -17,7 +17,6 @@ def perform_inference(dataset, splits, trainer):
         print(f"Processing {split} partition...")
         
         # Use the trainer predict method to get predictions on the split
-        # TODO use trainer evaluate to avoid OOM (not keeping gradients)
         predictions = trainer.predict(dataset[split])
         actual_labels = predictions.label_ids
         predicted_labels = predictions.predictions[0] if isinstance(predictions.predictions, tuple) else predictions.predictions
