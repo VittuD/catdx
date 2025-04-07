@@ -2,10 +2,9 @@
 
 from typing import Union
 from src.trainers.TrainingArguments_projection import TrainingArguments_projection
-from transformers import Trainer, PreTrainedModel, Dataset, PredictionOutput
+from transformers import Trainer, PreTrainedModel
 from src.utils.utils import compute_r2, compute_mae, compute_std, compute_mse
 from scipy.stats import pearsonr
-from typing import Optional, List
 import torch
 from torch import nn
 from torch.optim.lr_scheduler import StepLR
@@ -15,6 +14,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from src.trainers.DifferentiableAllGather import DifferentiableAllGather
+from transformers.trainer_pt_utils import nested_detach
+import tqdm
 
 
 class LogTrainer(Trainer):
@@ -79,6 +80,121 @@ class LogTrainer(Trainer):
         else:
             return super().create_scheduler(num_training_steps, optimizer)
 
+    # Override to reduce CUDA memory usage
+    def prediction_step(
+        self,
+        model: torch.nn.Module,
+        inputs: dict,
+        prediction_loss_only: bool,
+        ignore_keys: list = None,
+    ):
+        has_labels = any(inputs.get(k) is not None for k in self.label_names)
+        inputs = self._prepare_inputs(inputs)
+        with torch.no_grad():
+            outputs = model(**inputs)
+            # If outputs is a dict, extract loss and logits by key
+            if isinstance(outputs, dict):
+                loss = outputs.get("loss", None)
+                logits = outputs.get("logits", None)
+            else:
+                # Fallback to tuple slicing if outputs is not a dict
+                if has_labels:
+                    loss, logits = outputs[:2]
+                else:
+                    loss = None
+                    logits = outputs[0]
+
+            # If using past states, save them appropriately
+            if self.args.past_index >= 0:
+                self._past = outputs[self.args.past_index] if has_labels else outputs[self.args.past_index - 1]
+
+        if prediction_loss_only:
+            return (loss.detach().cpu() if loss is not None else None, None, None)
+
+        labels = inputs.get("labels")
+        if labels is not None:
+            labels = labels.detach().cpu()
+
+        # Move logits and loss to eval_device (CPU)
+        loss = loss.detach().cpu() if loss is not None else None
+        logits = logits.detach().cpu() if logits is not None else None
+        labels = labels.detach().cpu() if labels is not None else None
+            
+        return (loss, logits, labels)
+
+    def custom_predict_loop(self, dataset):
+        results = {}
+        for partition_name, partition_data in dataset.items():
+            test_dataloader = self.get_test_dataloader(partition_data)
+    
+            # Initialize containers for the aggregated outputs
+            partition_outputs = {
+                "loss": [],
+                "logits": [],
+                "projections": [],
+                "hidden_states": [],
+                "labels": []
+            }
+    
+            for step, batch in enumerate(tqdm.tqdm(test_dataloader, desc=f"Processing {partition_name}")):
+                has_labels = "labels" in batch and (batch["labels"] is not None)
+                if hasattr(self, "_prepare_inputs"):
+                    batch = self._prepare_inputs(batch)
+    
+                with torch.no_grad():
+                    outputs = self.model(**batch)
+    
+                    if isinstance(outputs, dict):
+                        loss = outputs.get("loss", None)
+                        logits = outputs.get("logits", None)
+                        projections = outputs.get("projections", None)
+                        hidden_states = outputs.get("hidden_states", None)
+                    else:
+                        # Handle tuple outputs
+                        if has_labels:
+                            if len(outputs) >= 4:
+                                loss, logits, projections, hidden_states = outputs[:4]
+                            elif len(outputs) >= 3:
+                                loss, logits, projections = outputs[:3]
+                                hidden_states = None
+                            else:
+                                loss, logits = outputs[:2]
+                                projections, hidden_states = None, None
+                        else:
+                            if len(outputs) >= 3:
+                                logits, projections, hidden_states = outputs[:3]
+                                loss = None
+                            else:
+                                logits = outputs[0]
+                                loss, projections, hidden_states = None, None, None
+    
+                # Detach and move to CPU
+                loss = loss.detach().cpu() if loss is not None else None
+                logits = logits.detach().cpu() if logits is not None else None
+                projections = projections.detach().cpu() if projections is not None else None
+                hidden_states = nested_detach(hidden_states)[-1][:,0,:] if hidden_states is not None else None
+                labels = batch.get("labels")
+                labels = labels.detach().cpu() if labels is not None else None
+    
+                # Append to partition outputs
+                if loss is not None:
+                    partition_outputs["loss"].append(loss)
+                if logits is not None:
+                    partition_outputs["logits"].append(logits)
+                if projections is not None:
+                    partition_outputs["projections"].append(projections)
+                if hidden_states is not None:
+                    partition_outputs["hidden_states"].append(hidden_states)
+                if labels is not None:
+                    partition_outputs["labels"].append(labels)
+    
+            # Concatenate tensors where possible
+            results[partition_name] = {
+                key: torch.cat(val, dim=0) if val and isinstance(val[0], torch.Tensor) else val
+                for key, val in partition_outputs.items()
+            }
+    
+        return results
 
 
     def log(self, logs, start_time="NaN"):

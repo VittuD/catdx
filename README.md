@@ -28,7 +28,7 @@ The config file is a json file that contains the following fields:
 To run the script use the Dockerfile_python with the submit wrapper.
 e.g.
 ```bash
-submit --name vivit-unsup --gpus 1 --mount $(pwd):/workspace  eidos-service.di.unito.it/vitturini/vivit:python
+submit --name vivit-unsup --gpus N --mount $(pwd):/workspace  eidos-service.di.unito.it/vitturini/vivit:python
 ```
 
 for the logs use:

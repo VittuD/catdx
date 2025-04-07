@@ -10,6 +10,28 @@ import pandas as pd
 from datasets import Dataset, Features, Value, Video, DatasetDict
 
 
+def safe_cat(existing, new):
+    # Return early if one of the inputs is None or empty
+    if existing is None or (isinstance(existing, (list, tuple)) and not existing):
+        return new
+    if new is None or (isinstance(new, (list, tuple)) and not new):
+        return existing
+
+    # Ensure tensors are on CPU
+    if isinstance(existing, torch.Tensor):
+        existing = existing.cpu()
+    if isinstance(new, torch.Tensor):
+        new = new.cpu()
+
+    # Convert lists/tuples to tensors
+    if isinstance(existing, (list, tuple)):
+        existing = torch.cat(existing, dim=0)
+    if isinstance(new, (list, tuple)):
+        new = torch.cat(new, dim=0)
+
+    return torch.cat([existing, new], dim=0)
+
+
 def get_image_processor(resize_to, num_channels):
     # Generate a list with num_channels times elements (Imagenet standard normalization)
     image_mean = [0.5] * num_channels

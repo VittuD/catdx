@@ -1,9 +1,9 @@
-from src.utils.utils import load_dataset, get_image_processor, collate_fn
+from src.utils.utils import load_dataset, get_image_processor, collate_fn, safe_cat
 from src.models.model_utils import load_model
 from src.trainers.trainer import LogTrainer
 import os
 import wandb
-from src.models.model_testing import run_inference_and_save, save_results
+from src.models.model_testing import run_inference_and_save, save_results, process_predictions
 from src.scripts.prediction_analysis import generate_predictions_report
 import torch
 from transformers import VivitConfig, HfArgumentParser, TrainerCallback
@@ -12,6 +12,9 @@ import hydra
 from omegaconf import DictConfig
 from src.config.hydra_config import update_experiment_name, write_configs_to_json
 from accelerate import Accelerator
+from src.estimators.estimators import AgeEstimator
+import torch.distributed as dist
+import numpy as np
 
 accelerator = Accelerator()
 
@@ -55,14 +58,18 @@ def run_inference_directly(cfg, dataset, trainer):
         wandb.save(pdf_file)
 
 @accelerator.on_main_process
+# TODO this might be a duplicate at the moment, check if it can be removed
 def run_inference_regressor(cfg, dataset, model, trainer):
     # Use the model's forward to get raw outputs (before the regressor) with torch.no_grad
     raw_outputs = {}
     for partition_name, partition_data in dataset.items():
-        raw_outputs[partition_name] = trainer.offload_predict(partition_data)
+        raw_outputs[partition_name] = trainer.predict(partition_data)
+
+    # Process the raw outputs to get the predictions
+    processed_results = process_predictions(raw_outputs)
 
     # For each raw output partition, save the predictions to a CSV file
-    saved_files = save_results(raw_outputs, cfg.experiment_name)
+    saved_files = save_results(processed_results, cfg.experiment_name)
 
     # Generate predictions report
     pdf_files = []
@@ -73,6 +80,62 @@ def run_inference_regressor(cfg, dataset, model, trainer):
         wandb.save(pdf_file)
 
     return raw_outputs
+
+def custom_predict_loop(trainer, dataset):
+    predictions = trainer.custom_predict_loop(dataset)
+    # Predictions has structure:
+    # {
+    #     'train': {'loss': ..., 'logits': ..., 'projections': ..., 'hidden_states': ..., 'labels': ...},
+    #     'validation': {'loss': ..., 'logits': ..., 'projections': ..., 'hidden_states': ..., 'labels': ...},
+    #     'test': {'loss': ..., 'logits': ..., 'projections': ..., 'hidden_states': ..., 'labels': ...},
+    # }
+    # Each entry in the list is a dictionary with keys 'loss', 'logits', 'projections', 'hidden_states', and 'labels'
+    if dist.is_initialized():
+        # Gather predictions from all processes using all_gather_object
+        gathered_predictions = [None] * dist.get_world_size()
+        dist.all_gather_object(gathered_predictions, predictions)
+        # Concatenate the gathered predictions
+        complete_predictions = {}
+        # gathered_predictions is a list on n_machine elements, iterate over it
+        for i in range(len(gathered_predictions)):
+            for split_name in gathered_predictions[i].keys():
+                current = gathered_predictions[i][split_name]
+                existing = complete_predictions.get(split_name, {})
+
+                complete_predictions[split_name] = {
+                    'loss': safe_cat(existing.get('loss'), current['loss']),
+                    'logits': safe_cat(existing.get('logits'), current['logits']),
+                    'projections': safe_cat(existing.get('projections'), current['projections']),
+                    'hidden_states': safe_cat(existing.get('hidden_states'), current['hidden_states']),
+                    'labels': safe_cat(existing.get('labels'), current['labels']),
+                }
+
+    else:
+        # If not distributed, just use the predictions as is
+        complete_predictions = predictions
+    return complete_predictions
+
+@accelerator.on_main_process
+def compute_mae_on_partitions(data):
+    estimator = AgeEstimator()
+
+    print("Training estimator")
+    # data['train'] is a list of dicts where each dict contains keys like 'loss', 'logits', 'projections', 'hidden_states', and 'labels'
+    mae_results = {}
+    for split_name, split_data in data.items():
+        # split_data is a list of dicts with keys like 'hidden_states' and 'labels'
+        labels = split_data['labels'].cpu().numpy()
+
+        cls_tokens = split_data['hidden_states'].cpu().numpy()
+
+        if split_name == 'train':
+            mae = estimator.fit(cls_tokens, labels)
+        else:
+            mae = estimator.score(cls_tokens, labels)
+        mae_results[split_name] = mae
+
+    return mae_results
+
 
 
 @hydra.main(config_path="configs", config_name="config", version_base="1.1")
@@ -151,9 +214,15 @@ def main(cfg: DictConfig):
     torch.cuda.empty_cache()
 
     # Run sci-kit regressor only if training mode contains contrastive
-    if 'contrastive' in cfg.trainer_config.training_mode:
-        raw_outputs = run_inference_regressor(cfg, dataset, model, trainer)
+    if 'contrastive' in cfg.trainer_config.training_mode:# Train a regressor (estimators.py Ridge regression) on every class token of the 'train' partition
+        data = custom_predict_loop(trainer, dataset)
 
+        processed_data = compute_mae_on_partitions(data)
+        print(processed_data)
+        # Log processed data for each split to wandb
+        for split_name, mae in processed_data.items():
+            wandb.log({f"{split_name}_mae_ridge": mae})
+        
     
     # Run inference and save results only if training mode contains regression
     if 'regression' in cfg.trainer_config.training_mode:

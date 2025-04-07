@@ -4,36 +4,48 @@ import torch
 
 # Function to perform inference and collect predictions for each partition
 def perform_inference(dataset, splits, trainer):
-    results = {split: [] for split in splits}  # Store results separately for each split
-
-    # Get the available splits in the dataset
+    """
+    Performs inference on each available split in the dataset using the trainer.
+    Returns a dictionary with raw prediction outputs per split.
+    """
+    raw_results = {}
     available_splits = dataset.keys()
 
-    # Iterate over the provided splits list
     for split in splits:
         if split not in available_splits:
             print(f"Skipping {split} partition since it does not exist in the dataset.")
-            continue  # Skip this partition if it doesn't exist
-        print(f"Processing {split} partition...")
-        
-        # Use the trainer predict method to get predictions on the split
+            continue
+        print(f"Performing inference on {split} partition...")
         predictions = trainer.predict(dataset[split])
-        actual_labels = predictions.label_ids
-        predicted_labels = predictions.predictions[0] if isinstance(predictions.predictions, tuple) else predictions.predictions
+        raw_results[split] = predictions
+        # TODO process the predictions
 
-        # Iterate over the predictions and actual labels
-        for prediction, actual_label in zip(predicted_labels, actual_labels):
-            results[split].append({
-            'actual': actual_label,
-            'predicted': prediction[0]  # Extract the number directly from the prediction array
-            })
-
-        print(f"Predictions for {split} partition completed.")
-
-        # Clear cuda cache
+        # Clear CUDA cache
         torch.cuda.empty_cache()
 
-    return results
+    return raw_results
+
+def process_predictions(raw_results):
+    """
+    Processes raw prediction outputs from the inference function.
+    Returns a dictionary with processed results for each split.
+    Each result item is a dict with 'actual' and 'predicted' keys.
+    """
+    processed_results = {}
+    for split, predictions in raw_results.items():
+        actual_labels = predictions.label_ids
+        # If predictions contain a tuple, take the first item; otherwise use predictions directly
+        predicted_labels = predictions.predictions[0] if isinstance(predictions.predictions, tuple) else predictions.predictions
+
+        processed_results[split] = []
+        for prediction, actual_label in zip(predicted_labels, actual_labels):
+            processed_results[split].append({
+                'actual': actual_label,
+                'predicted': prediction[0],  # Extract the number directly from the prediction array
+            })
+        print(f"Processing predictions for {split} partition completed.")
+
+    return processed_results
 
 # Function to save the results to a CSV file in the model's folder
 def save_results(results, output_dir):
@@ -44,6 +56,7 @@ def save_results(results, output_dir):
         if split_results:  # Check if the results list is not empty
             print(f"Saving predictions for {split} partition...")
             output_file = os.path.join(output_dir, f'predictions_{split}.csv')
+            split_results = [dict(zip(['actual', 'predicted'], item.values())) for item in split_results]
             df = pd.DataFrame(split_results)
             df.to_csv(output_file, index=False)
             saved_files.append(output_file)
@@ -65,6 +78,9 @@ def run_inference_and_save(dataset, trainer, output_dir, splits=['train', 'valid
 
     # Perform inference and collect predictions
     results = perform_inference(dataset, splits, trainer)
+    
+    # Process the raw results to extract actual and predicted labels
+    results = process_predictions(results)
 
     # Save the results to a separate CSV file for each split
     saved_files = save_results(results, output_dir)

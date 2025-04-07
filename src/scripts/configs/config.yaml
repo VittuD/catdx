@@ -1,4 +1,4 @@
-experiment_name: debug
+experiment_name: debug_1
 secrets_file: /scratch/catdx/.secrets
 
 model_config:
