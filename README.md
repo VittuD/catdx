@@ -1,42 +1,42 @@
 # catdx
-Vivit fine tuning on medical data.
 
+This repository contains a Vivit fine-tuning project on medical data.
 
-## Config file
-The config file is a json file that contains the following fields:
-- run_name: the name of the run, is also the name of the folder where the results are saved
-- dataset_folder: the path to the dataset folder
-- remove_unused_columns: boolean, whether to remove unused columns
-- training_mode: `contrastive` (freeze the prediction head and trains with contrastive loss), `regression` (trains only the prediction head with mse loss)
-- freeze: `backbone`, `projection_head`, `classifier` or another `layer name` to freeze
-- fp16: boolean, whether to use fp16
-- resize_to: the size to resize the images to
-- learning_rate: defaults to 5e-5
-- warmup_steps: defaults to 0
-- weight_decay: defaults to 0.01
-- num_train_epochs: defaults to 5
-- per_device_train_batch_size: defaults to 8
-- per_device_eval_batch_size: defaults to 8
-- tubelet_size: defaults to [2, 16, 16]
-- logging_first_step: boolean, whether to log the first step
-- logging_strategy: defaults to epoch, refer to huggingface documentation
-- save_strategy: defaults to epoch, refer to huggingface documentation
-- eval_strategy: defaults to epoch, refer to huggingface documentation
-- report_to: defaults to wandb, refer to huggingface documentation
+## Need to Know
+- A `.secrets` file must be placed in the repo's root directory to store your wandb API key.
+- The `src` directory contains the main codebase, while the `scripts` directory contains scripts for running the project.
+- The `configs` directory contains configuration files for the project.
+- Set up the dataset directory and update the configuration at `src/scripts/configs/config.yaml` accordingly.
+- The wandb project integration is pending (#TODO).
 
-
-To run the script use the Dockerfile_python with the submit wrapper.
-e.g.
+## Python (Single Run) Container
+To run the script using the Python container on HSSH, use the following command:
 ```bash
-submit --name vivit-unsup --gpus N --mount $(pwd):/workspace  eidos-service.di.unito.it/vitturini/vivit:python
+submit --name my_container --gpus N --mount $(pwd):/workspace eidos-service.di.unito.it/vitturini/vivit:python
 ```
-
-for the logs use:
+View logs with:
 ```bash
 docker service logs -f name_of_the_container
 ```
-
-Devcontainer:
+To remove the container when finished:
 ```bash
-submit --name vivit-dev --gpus 2 --mount /mnt/fast-scratch/vitturini/catdx:/scratch/catdx eidos-service.di.unito.it/vitturini/vivit:dev
+docker service rm my_container
+```
+
+## Devcontainer
+Run the development container on HSSH using:
+```bash
+submit --name my_container-dev --gpus N --mount /mnt/fast-scratch/vitturini/catdx:/scratch/catdx eidos-service.di.unito.it/vitturini/vivit:dev
+```
+Check which machine your devcontainer is running on:
+```bash
+docker service ps my_container
+```
+When finished, scale the container down:
+```bash
+docker service scale my_container=0
+```
+To reconnect (scale up) with the devcontainer:
+```bash
+docker service scale my_container=1
 ```
