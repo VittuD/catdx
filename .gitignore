@@ -1,5 +1,4 @@
 .secrets
-.vscode/
 catdx_legacy/
 data/
 !src/data/

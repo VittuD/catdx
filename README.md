@@ -40,3 +40,7 @@ To reconnect (scale up) with the devcontainer:
 ```bash
 docker service scale my_container=1
 ```
+To run the multi-gpu training script from inside the container:
+```bash
+accelerate launch -m src.scripts.main
+```

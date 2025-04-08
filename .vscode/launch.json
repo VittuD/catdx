@@ -1,0 +1,44 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Report Module",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.scripts.report",
+            "console": "integratedTerminal",
+            "args": [
+                "--checkpoint_dir", 
+                "/scratch/catdx/outputs/2025-03-08/14-33-45/test_e2e_reg/checkpoint-266"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: Main",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.scripts.main",
+            "console": "integratedTerminal",
+            // "args": [
+            //     "--is_unsupervised",
+            //     "true"
+            // ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: Main Accelerate",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "accelerate.commands.launch",
+            "console": "integratedTerminal",
+            "args": [
+                "-m",
+                "src.scripts.main",
+            ],
+            "justMyCode": false
+        },
+    ]
+}
