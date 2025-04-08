@@ -80,48 +80,8 @@ class LogTrainer(Trainer):
         else:
             return super().create_scheduler(num_training_steps, optimizer)
 
-    # Override to reduce CUDA memory usage
-    def prediction_step(
-        self,
-        model: torch.nn.Module,
-        inputs: dict,
-        prediction_loss_only: bool,
-        ignore_keys: list = None,
-    ):
-        has_labels = any(inputs.get(k) is not None for k in self.label_names)
-        inputs = self._prepare_inputs(inputs)
-        with torch.no_grad():
-            outputs = model(**inputs)
-            # If outputs is a dict, extract loss and logits by key
-            if isinstance(outputs, dict):
-                loss = outputs.get("loss", None)
-                logits = outputs.get("logits", None)
-            else:
-                # Fallback to tuple slicing if outputs is not a dict
-                if has_labels:
-                    loss, logits = outputs[:2]
-                else:
-                    loss = None
-                    logits = outputs[0]
 
-            # If using past states, save them appropriately
-            if self.args.past_index >= 0:
-                self._past = outputs[self.args.past_index] if has_labels else outputs[self.args.past_index - 1]
-
-        if prediction_loss_only:
-            return (loss.detach().cpu() if loss is not None else None, None, None)
-
-        labels = inputs.get("labels")
-        if labels is not None:
-            labels = labels.detach().cpu()
-
-        # Move logits and loss to eval_device (CPU)
-        loss = loss.detach().cpu() if loss is not None else None
-        logits = logits.detach().cpu() if logits is not None else None
-        labels = labels.detach().cpu() if labels is not None else None
-            
-        return (loss, logits, labels)
-
+    # TODO we probably need to override predict_step to offload instead of using the default predict method
     def custom_predict_loop(self, dataset):
         results = {}
         for partition_name, partition_data in dataset.items():
@@ -215,6 +175,7 @@ class LogTrainer(Trainer):
         super().log(logs)
 
     def mse_loss(self, outputs, labels):
+        # TODO Investigate RuntimeError: The size of tensor a (8) must match the size of tensor b (32) at non-singleton dimension 0
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs["logits"].squeeze())
         loss = torch.nn.functional.mse_loss(predictions, labels)
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
@@ -244,12 +205,14 @@ class LogTrainer(Trainer):
         
         
         if self.gather_loss:
-            features, labels = self._gather_features_labels(features, labels)
+            labels = self._gather_element(labels)
+            features = self._gather_element(features)
+            outputs['logits'] = self._gather_element(outputs["logits"])
 
         # plot is true if this is the first minibatch of the epoch and is main process
         epoch = self.state.epoch % 1 == 0
         is_main_process = self.accelerator.is_main_process
-        is_training = model.training 
+        is_training = model.training
         plot = epoch and is_main_process and is_training
 
         loss = self._compute_loss(outputs, features, labels, model, plot)
@@ -275,19 +238,14 @@ class LogTrainer(Trainer):
 
         labels = None
         return inputs, labels
-    
-    def _gather_features_labels(self, features, labels):
+
+    def _gather_element(self, element):
         num_proc = self.accelerator.num_processes
-        # Use the custom differentiable gather for features.
-        gathered_features = DifferentiableAllGather.apply(features)
-        gathered_features = self._reorder_augmented_tensor(gathered_features, num_proc)
-        if labels is not None:
-            gathered_labels = DifferentiableAllGather.apply(labels)
-            gathered_labels = self._reorder_augmented_tensor(gathered_labels, num_proc)
-        else:
-            gathered_labels = None
-        return gathered_features, gathered_labels
-    
+        gathered = DifferentiableAllGather.apply(element)
+        if self.is_unsupervised:
+            gathered = self._reorder_augmented_tensor(gathered, num_proc)
+        return gathered
+
     def _reorder_augmented_tensor(self, features: torch.Tensor, num_proc: int) -> torch.Tensor:
         """
         Reorders a gathered features tensor from a multi-GPU SimCLR model.

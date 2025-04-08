@@ -21,6 +21,7 @@ model_config:
   model_name_or_path: "google/vivit-b-16x2"
 
 trainer_config:
+  auto_find_batch_size: false
   gather_loss: true
   contrastive_sigma: 0.15
   contrastive_method: expw
@@ -39,7 +40,7 @@ trainer_config:
   lr_scheduler_kwargs:
     step_size_epochs: 100
     gamma: 0.5
-  num_train_epochs: 0
+  num_train_epochs: 500
   per_device_eval_batch_size: 8
   per_device_train_batch_size: 8
   remove_unused_columns: false

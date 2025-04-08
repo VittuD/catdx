@@ -44,3 +44,10 @@ To run the multi-gpu training script from inside the container:
 ```bash
 accelerate launch -m src.scripts.main
 ```
+
+## Sweep Container
+! WARNING: This container is not yet functional. It is a work in progress and should not be used for now.
+
+## WARNINGS
+- A refactoring of the code is scheduled soon.
+- The sweep container mounts the source code, so code should not be modified from anywhere when running the sweep.

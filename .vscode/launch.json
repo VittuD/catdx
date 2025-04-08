@@ -35,6 +35,8 @@
             "module": "accelerate.commands.launch",
             "console": "integratedTerminal",
             "args": [
+                // "--num_processes",
+                // "2",
                 "-m",
                 "src.scripts.main",
             ],

@@ -16,9 +16,11 @@ def perform_inference(dataset, splits, trainer):
             print(f"Skipping {split} partition since it does not exist in the dataset.")
             continue
         print(f"Performing inference on {split} partition...")
-        predictions = trainer.predict(dataset[split])
+        # predictions = trainer.predict(dataset[split])
+        # raw_results[split] = predictions
+
+        predictions = trainer.custom_predict_loop(dataset[split])
         raw_results[split] = predictions
-        # TODO process the predictions
 
         # Clear CUDA cache
         torch.cuda.empty_cache()
@@ -33,15 +35,19 @@ def process_predictions(raw_results):
     """
     processed_results = {}
     for split, predictions in raw_results.items():
-        actual_labels = predictions.label_ids
+        actual_labels = predictions['labels']
         # If predictions contain a tuple, take the first item; otherwise use predictions directly
-        predicted_labels = predictions.predictions[0] if isinstance(predictions.predictions, tuple) else predictions.predictions
+        predicted_labels = predictions['logits'][0] if isinstance(predictions['logits'], tuple) else predictions['logits']
 
         processed_results[split] = []
         for prediction, actual_label in zip(predicted_labels, actual_labels):
+            label = actual_label.item() if isinstance(actual_label, torch.Tensor) else actual_label
+            value = prediction[0]
+            if isinstance(value, torch.Tensor):
+                value = value.item()
             processed_results[split].append({
-                'actual': actual_label,
-                'predicted': prediction[0],  # Extract the number directly from the prediction array
+                'actual': label,
+                'predicted': value,
             })
         print(f"Processing predictions for {split} partition completed.")
 

@@ -11,12 +11,14 @@ from src.trainers.TrainingArguments_projection import TrainingArguments_projecti
 import hydra
 from omegaconf import DictConfig
 from src.config.hydra_config import update_experiment_name, write_configs_to_json
-from accelerate import Accelerator
+from accelerate import Accelerator, DistributedDataParallelKwargs
 from src.estimators.estimators import AgeEstimator
 import torch.distributed as dist
-import numpy as np
+from omegaconf import OmegaConf
 
-accelerator = Accelerator()
+
+ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
 @accelerator.on_main_process
 def print_gpus(device):
@@ -137,6 +139,68 @@ def compute_mae_on_partitions(data):
     return mae_results
 
 
+@accelerator.on_main_process
+def wandb_init_for_regression(original_name, cfg):
+    wandb.finish()
+
+    regression_name = f"{original_name}_regression"
+    wandb.init(
+        project=os.environ.get("WANDB_PROJECT", "default_project"),
+        name=regression_name,
+        config=OmegaConf.to_container(cfg, resolve=True),
+        reinit=True
+    )
+
+def train_regression_head(cfg, dataset, model, trainer):
+    # Edit the configs so that it creates a new trainer
+    # The new trainer runs for 50 epochs
+    # The training mode is 'regression'
+    # The 'auto_find_batch_size' is set to True
+    # The lr is 5e-5 (deafult)
+    cfg.trainer_config.training_mode = 'regression'
+    cfg.trainer_config.auto_find_batch_size = True
+    cfg.trainer_config.num_train_epochs = 50
+    cfg.trainer_config.learning_rate = 5e-4
+    cfg.trainer_config.is_unsupervised = False
+
+    parser = HfArgumentParser(TrainingArguments_projection)
+    training_args, = parser.parse_dict(cfg.trainer_config, allow_extra_keys=True)
+    
+    new_trainer = LogTrainer(
+        model,
+        training_args,
+        train_dataset=dataset['train'],
+        eval_dataset=dataset.get('validation'),
+        data_collator=lambda examples: collate_fn(
+            examples,
+            get_image_processor(model.config.image_size, cfg.model_config.num_channels),
+            cfg.model_config.num_channels
+        ),
+    )
+
+    wandb_init_for_regression(cfg.experiment_name, cfg)
+
+    new_trainer.train()
+
+    model.save_pretrained(cfg.experiment_name)
+
+    # Perform inference on the validation set
+    # Theoretically, this should be catched by the main loop since we changed the training mode
+    # run_inference_directly(cfg, dataset, new_trainer)5
+
+@accelerator.on_main_process
+def save_results_pdf(results, output_dir):
+    saved_files = save_results(results, output_dir)
+    # Generate predictions report
+    pdf_files = []
+    for file in saved_files:
+        pdf_files.append(generate_predictions_report(file))
+    # Log each PDF file to wandb as its own artifact with a dynamically extracted alias
+    for pdf_file in pdf_files:
+        wandb.save(pdf_file)
+
+
+
 
 @hydra.main(config_path="configs", config_name="config", version_base="1.1")
 def main(cfg: DictConfig):
@@ -215,18 +279,22 @@ def main(cfg: DictConfig):
 
     # Run sci-kit regressor only if training mode contains contrastive
     if 'contrastive' in cfg.trainer_config.training_mode:# Train a regressor (estimators.py Ridge regression) on every class token of the 'train' partition
-        data = custom_predict_loop(trainer, dataset)
-
-        processed_data = compute_mae_on_partitions(data)
-        print(processed_data)
-        # Log processed data for each split to wandb
-        for split_name, mae in processed_data.items():
-            wandb.log({f"{split_name}_mae_ridge": mae})
+        # data = custom_predict_loop(trainer, dataset)
+        # processed_data = compute_mae_on_partitions(data)
+        # print(processed_data)
+        # # Log processed data for each split to wandb
+        # for split_name, mae in processed_data.items():
+        #     wandb.log({f"{split_name}_mae_ridge": mae})
+        
+        # Use train_regression_head
+        train_regression_head(cfg, dataset, model, trainer)
         
     
     # Run inference and save results only if training mode contains regression
     if 'regression' in cfg.trainer_config.training_mode:
-        run_inference_directly(cfg, dataset, trainer)
+        data = custom_predict_loop(trainer, dataset)
+        processed_data = process_predictions(data)
+        save_results_pdf(processed_data, cfg.experiment_name)
 
 if __name__ == '__main__':
     main()
