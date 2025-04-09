@@ -81,7 +81,6 @@ class LogTrainer(Trainer):
             return super().create_scheduler(num_training_steps, optimizer)
 
 
-    # TODO we probably need to override predict_step to offload instead of using the default predict method
     def custom_predict_loop(self, dataset):
         results = {}
         for partition_name, partition_data in dataset.items():
@@ -175,7 +174,6 @@ class LogTrainer(Trainer):
         super().log(logs)
 
     def mse_loss(self, outputs, labels):
-        # TODO Investigate RuntimeError: The size of tensor a (8) must match the size of tensor b (32) at non-singleton dimension 0
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs["logits"].squeeze())
         loss = torch.nn.functional.mse_loss(predictions, labels)
         self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
@@ -205,8 +203,10 @@ class LogTrainer(Trainer):
         
         
         if self.gather_loss:
-            labels = self._gather_element(labels)
-            features = self._gather_element(features)
+            # TODO consider side effects on performance if waiting for all processes
+            self.accelerator.wait_for_everyone()
+            labels = self._gather_element(labels) if not self.is_unsupervised else None
+            features = self._gather_element(features) if features is not None else None
             outputs['logits'] = self._gather_element(outputs["logits"])
 
         # plot is true if this is the first minibatch of the epoch and is main process
@@ -307,7 +307,6 @@ class LogTrainer(Trainer):
 
         return augmented_inputs
 
-    # TODO this might be saving/augmenting the same frame multiple times
     def _apply_augmentations(self, video):
         """
         Apply a single set of augmentations to an entire video using Albumentations'
