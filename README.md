@@ -9,7 +9,7 @@ This repository contains a Vivit fine-tuning project on medical data.
 - Set up the dataset directory and update the configuration at `src/scripts/configs/config.yaml` accordingly.
 - The wandb project integration is pending (#TODO).
 
-## Python (Single Run) Container
+## Python (Single Run, Single GPU) Container
 To run the script using the Python container on HSSH, use the following command:
 ```bash
 submit --name my_container --gpus N --mount $(pwd):/workspace eidos-service.di.unito.it/vitturini/vivit:python
@@ -22,6 +22,13 @@ To remove the container when finished:
 ```bash
 docker service rm my_container
 ```
+
+## Accelerate (Single Run, Multi GPU) Container
+To run the script using the Accelerate container on HSSH, use the following command:
+```bash
+submit --name my_container --gpus N --mount $(pwd):/workspace eidos-service.di.unito.it/vitturini/vivit:accelerate
+```
+The script will use by default every GPU allocated to the container, everything else is the same as the Python container.
 
 ## Devcontainer
 Run the development container on HSSH using:
