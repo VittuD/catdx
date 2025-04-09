@@ -291,10 +291,9 @@ def main(cfg: DictConfig):
         
     
     # Run inference and save results only if training mode contains regression
-    if 'regression' in cfg.trainer_config.training_mode:
-        data = custom_predict_loop(trainer, dataset)
-        processed_data = process_predictions(data)
-        save_results_pdf(processed_data, cfg.experiment_name)
+    data = custom_predict_loop(trainer, dataset)
+    processed_data = process_predictions(data)
+    save_results_pdf(processed_data, cfg.experiment_name)
 
 if __name__ == '__main__':
     main()
