@@ -75,8 +75,14 @@ class LogTrainer(Trainer):
                 steps_per_epoch = num_training_steps // self.args.num_train_epochs
 
             # Get the step size in epochs from your extra kwargs
-            step_size_epochs = self.args.lr_scheduler_kwargs.get("step_size_epochs", 1)
-            step_size_steps = step_size_epochs * steps_per_epoch
+            raw_step_size_epochs = self.args.lr_scheduler_kwargs.get("step_size_epochs", 1)
+            # If raw_step_size_epochs is a float less than 1, treat it as a fraction of total epochs
+            if isinstance(raw_step_size_epochs, float) and raw_step_size_epochs < 1:
+                step_size_epochs = self.args.num_train_epochs * raw_step_size_epochs
+            else:
+                step_size_epochs = raw_step_size_epochs
+
+            step_size_steps = int(step_size_epochs * steps_per_epoch)
             gamma = self.args.lr_scheduler_kwargs.get("gamma", 0.1)
             
             self.lr_scheduler = StepLR(optimizer, step_size=step_size_steps, gamma=gamma)
