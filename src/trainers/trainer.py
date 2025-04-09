@@ -41,6 +41,11 @@ class LogTrainer(Trainer):
 
         model.set_training_mode(self.training_mode)
 
+        # Adjust the step size by dividing it by the number of processes
+        self.args.lr_scheduler_kwargs["step_size_epochs"] = (
+            self.args.lr_scheduler_kwargs.get("step_size_epochs", 100) // self.accelerator.num_processes
+        )
+
         # Halve the batch size for unsupervised learning (since we double the batch size with augmentations)
         if self.is_unsupervised:
             args.per_device_train_batch_size //= 2
@@ -203,7 +208,6 @@ class LogTrainer(Trainer):
         
         
         if self.gather_loss:
-            # TODO consider side effects on performance if waiting for all processes
             self.accelerator.wait_for_everyone()
             labels = self._gather_element(labels) if not self.is_unsupervised else None
             features = self._gather_element(features) if features is not None else None
