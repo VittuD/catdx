@@ -1,0 +1,11 @@
+FROM eidos-service.di.unito.it/vitturini/vivit:base
+# Create a dev user with your specific UID (e.g., 1030)
+RUN useradd -m -u 1030 devuser && \
+    mkdir -p /scratch/catdx && \
+    chown -R devuser:devuser /scratch/catdx
+
+# Switch to the new user by default
+USER devuser
+
+# Set the entrypoint to keep the container running
+ENTRYPOINT ["tail", "-f", "/dev/null"]
