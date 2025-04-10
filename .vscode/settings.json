@@ -1,0 +1,20 @@
+{
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./tests",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true,
+    "files.exclude": {
+        // "**/.ssh": true,
+        // "**/.nv": true,
+        // "**/.dotnet": true,
+        // "**/.cache": true,
+        // "**/.gitconfig": true,
+        // "**/wandb": true,
+        // "**/.bash_history": true,
+    }
+}

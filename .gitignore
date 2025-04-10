@@ -1,11 +1,12 @@
 .secrets
-.vscode/
-dataset_apical4_none/
-catdx/
+catdx_legacy/
 data/
+!src/data/
 catdx
 .devcontainer/
 models/
+apical4_none*/
+apical4_none*/**
 wandb/
 __pycache__/
 

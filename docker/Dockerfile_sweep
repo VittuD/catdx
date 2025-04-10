@@ -1,0 +1,17 @@
+# Dockerfile.dev
+FROM eidos-service.di.unito.it/vitturini/vivit:base
+
+# Copy the src of the project directory into the container
+COPY src /workspace/src
+
+# Create data directory to mount datasets
+RUN mkdir /workspace/data
+
+# Set the working directory
+WORKDIR /workspace
+
+# Set wandb agent as the entrypoint
+ENTRYPOINT ["wandb", "agent"]
+
+## Before running the sweep, build and push the image to update src
+## This ensure persistence of the code in the container while keeping the image size small

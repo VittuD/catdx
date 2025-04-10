@@ -1,0 +1,5 @@
+# Base Image for Vivit
+FROM eidos-service.di.unito.it/vitturini/vivit:base
+
+# Set vscode as the entrypoint
+ENTRYPOINT ["python3", "-m" ,"src.scripts.main"]
