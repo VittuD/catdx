@@ -56,6 +56,8 @@ def create_datasets(csv_file, video_folder):
         features = Features({
             "file_name": Video(),
             "CO": Value("float"),
+            "CI": Value("float"),
+            "PVR": Value("float"),
             "partition": Value("string"),
         })
 

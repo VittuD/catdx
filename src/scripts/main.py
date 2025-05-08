@@ -151,16 +151,13 @@ def wandb_init_for_regression(original_name, cfg):
         reinit=True
     )
 
-def train_regression_head(cfg, dataset, model, trainer):
-    # Edit the configs so that it creates a new trainer
-    # The new trainer runs for 50 epochs
-    # The training mode is 'regression'
-    # The 'auto_find_batch_size' is set to True
-    # The lr is 5e-5 (deafult)
+def train_regression_head(cfg, dataset, model):
+    # Create a new trainer
     cfg.trainer_config.training_mode = 'regression'
     cfg.trainer_config.auto_find_batch_size = True
-    cfg.trainer_config.num_train_epochs = 50
-    cfg.trainer_config.learning_rate = 5e-4
+    cfg.trainer_config.num_train_epochs = 500
+    cfg.trainer_config.learning_rate = 5e-3
+    cfg.trainer_config.weight_decay = 0
     cfg.trainer_config.is_unsupervised = False
 
     parser = HfArgumentParser(TrainingArguments_projection)
@@ -180,9 +177,16 @@ def train_regression_head(cfg, dataset, model, trainer):
 
     wandb_init_for_regression(cfg.experiment_name, cfg)
 
-    new_trainer.train()
+    # Create a new 'regression' folder and change dir into that
+    regression_dir = os.path.join(cfg.experiment_name, 'regression')
+    os.makedirs(regression_dir, exist_ok=True)
+    os.chdir(regression_dir)
 
+    new_trainer.train()
+    
     model.save_pretrained(cfg.experiment_name)
+
+    os.chdir(cfg.experiment_name)
 
     # Perform inference on the validation set
     # Theoretically, this should be catched by the main loop since we changed the training mode
@@ -198,6 +202,19 @@ def save_results_pdf(results, output_dir):
     # Log each PDF file to wandb as its own artifact with a dynamically extracted alias
     for pdf_file in pdf_files:
         wandb.save(pdf_file)
+
+
+class MyCallback(TrainerCallback):
+    "A callback that prints a message at the beginning of training"
+    def __init__(self, trainer):
+        self.trainer = trainer
+
+    def on_epoch_begin(self, args, state, control, **kwargs):
+        self.trainer.plot = "train"
+    
+    # TODO This triggers after the loss forward so it does not log anything. MAybe on_epoch_end (?)
+    def on_epoch_end(self, args, state, control, **kwargs):
+        self.trainer.plot = "eval"
 
 
 
@@ -258,7 +275,10 @@ def main(cfg: DictConfig):
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
         data_collator = lambda examples: collate_fn(examples, image_processor, cfg.model_config.num_channels),
+        # callbacks=[MyCallback(trainer)],
     )
+
+    trainer.add_callback(MyCallback(trainer))
 
     if cfg.trainer_config.gather_loss:
         model, trainer = accelerator.prepare(model, trainer)
@@ -274,9 +294,6 @@ def main(cfg: DictConfig):
     # Save the model
     model.save_pretrained(cfg.experiment_name)
 
-    # Clear cuda cache
-    torch.cuda.empty_cache()
-
     # Run sci-kit regressor only if training mode contains contrastive
     if 'contrastive' in cfg.trainer_config.training_mode:# Train a regressor (estimators.py Ridge regression) on every class token of the 'train' partition
         # data = custom_predict_loop(trainer, dataset)
@@ -287,12 +304,13 @@ def main(cfg: DictConfig):
         #     wandb.log({f"{split_name}_mae_ridge": mae})
         
         # Use train_regression_head
-        train_regression_head(cfg, dataset, model, trainer)
+        train_regression_head(cfg, dataset, model)
         
     
     # Run inference and save results only if training mode contains regression
     data = custom_predict_loop(trainer, dataset)
     processed_data = process_predictions(data)
+    os.chdir('..')
     save_results_pdf(processed_data, cfg.experiment_name)
 
 if __name__ == '__main__':

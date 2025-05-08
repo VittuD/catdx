@@ -13,7 +13,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # DEBUG ONLY
-def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="matrix_heatmap", columns=None, epoch=None):
+# TODO subdivide between train and validation with title and legend
+def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="matrix_heatmap", plot=None, columns=None, epoch=None):
     """
     Creates a wandb.Table from the provided data and logs it.
     Also creates a heatmap from the data using matplotlib, places the x-axis legend on top,
@@ -43,22 +44,24 @@ def log_data_as_table_and_heatmap(data, key_table="logged_table", key_heatmap="m
     
     # Create and log the table.
     table = wandb.Table(data=data_list, columns=columns)
-    wandb.log({key_table: table})
+    wandb.log({f"{plot}_{key_table}": table})
     
     # Create a heatmap using matplotlib.
     fig, ax = plt.subplots()
     # Convert the data to a numpy array for imshow.
     heatmap_data = np.array(data_list)
-    # Fix the range of the plot from 0 to -5.
-    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-5, vmax=0)
+    # Fix the range of the plot from 1 to -1.
+    cax = ax.imshow(heatmap_data, cmap='viridis', vmin=-1, vmax=1)
     fig.colorbar(cax)
-    title = f"Heatmap Epoch {epoch}" if epoch is not None else "Heatmap"
+    title = f"{plot} Heatmap Epoch {epoch}" if epoch is not None else "Heatmap"
     ax.set_title(title)
     
     # Move x-axis ticks and labels to the top.
     ax.xaxis.tick_top()
     ax.xaxis.set_label_position('top')
     
+    # Set proper key for heatmap
+    key_heatmap = f"{plot}_{key_heatmap}"
     # Log the heatmap figure.
     wandb.log({key_heatmap: fig})
     
@@ -96,7 +99,7 @@ class KernelizedSupCon(nn.Module):
                f'kernel={self.kernel is not None}, ' \
                f'delta_reduction={self.delta_reduction})'
 
-    def forward(self, features, labels=None, plot=False, accelerator=None, epoch=None):
+    def forward(self, features, labels=None, plot=None, accelerator=None, epoch=None):
         """Compute loss for model. If `labels` is None, 
         it degenerates to SimCLR unsupervised loss:
         https://arxiv.org/pdf/2002.05709.pdf
@@ -157,15 +160,24 @@ class KernelizedSupCon(nn.Module):
             torch.matmul(features, features.T),
             self.temperature
         )
+        
+        # Multiply by temperature to get the unscaled similarity for logging only
+        with torch.no_grad():
+            similarity_anchor_dot_contrast = anchor_dot_contrast * self.temperature
+            # Log logits matrix on wandb on current step
+            if (wandb.run is not None) and (plot is not None) and accelerator.is_main_process:
+                # print(f"Logging logits matrix for {plot} at step {wandb.run.step}")
+                # Normalize in range [-1, 1] to obtain a similarity map (use temperature)
+                log_data_as_table_and_heatmap(
+                    similarity_anchor_dot_contrast.cpu().numpy(),
+                    key_table="logits_matrix" + "step_" + str(wandb.run.step),
+                    epoch=epoch,
+                    plot=plot
+                )
 
         # for numerical stability
         logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
         logits = anchor_dot_contrast - logits_max.detach()
-
-        # Log logits matrix on wandb on current step
-        if (wandb.run is not None) and plot and accelerator.is_main_process:
-            log_data_as_table_and_heatmap(logits.cpu().detach().numpy(), key_table="logits_matrix"
-            "step_" + str(wandb.run.step), epoch=epoch)
 
         alignment = logits 
 
@@ -193,11 +205,6 @@ class KernelizedSupCon(nn.Module):
             uniformity = torch.exp(logits * (1 - mask)) * inv_diagonal
 
         uniformity = torch.log(uniformity.sum(1, keepdim=True))
-
-        # Log uniformity matrix on wandb on current step
-        # if wandb.run is not None:
-        #     log_data_as_table(uniformity.cpu().detach().numpy(), key="uniformity_matrix"
-        #     "step_" + str(wandb.run.step))
 
         # positive mask contains the anchor-positive pairs
         # excluding <self,self> on the diagonal

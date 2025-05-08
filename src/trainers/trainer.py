@@ -41,17 +41,15 @@ class LogTrainer(Trainer):
 
         model.set_training_mode(self.training_mode)
 
-        # Adjust the step size by dividing it by the number of processes
-        self.args.lr_scheduler_kwargs["step_size_epochs"] = (
-            self.args.lr_scheduler_kwargs.get("step_size_epochs", 100) // self.accelerator.num_processes
-        )
-
         # Halve the batch size for unsupervised learning (since we double the batch size with augmentations)
         if self.is_unsupervised:
             args.per_device_train_batch_size //= 2
             args.per_device_eval_batch_size //= 2
 
         super().__init__(model=model, args=args, **kwargs)
+
+        # Adjust the step size by dividing it by the number of processes
+        args.lr_scheduler_kwargs["step_size_epochs"] /= self.accelerator.num_processes
 
         # Call the post initialization method
         self.__post_init__()
@@ -61,6 +59,10 @@ class LogTrainer(Trainer):
         self.label_names += ["labels"]
         self.epoch_wise_predictions = torch.tensor([])
         self.epoch_wise_labels = torch.tensor([])
+
+        # Additional attributes to plot sim matrices
+        self.plot = None
+
 
     # Override the create_scheduler method to add custom scheduler
     def create_scheduler(self, num_training_steps: int, optimizer=None):
@@ -82,6 +84,8 @@ class LogTrainer(Trainer):
             else:
                 step_size_epochs = raw_step_size_epochs
 
+            # Divide for num_processes=1
+            # step_size_steps = int(step_size_epochs * steps_per_epoch // torch.cuda.device_count())
             step_size_steps = int(step_size_epochs * steps_per_epoch)
             gamma = self.args.lr_scheduler_kwargs.get("gamma", 0.1)
             
@@ -219,13 +223,24 @@ class LogTrainer(Trainer):
             features = self._gather_element(features) if features is not None else None
             outputs['logits'] = self._gather_element(outputs["logits"])
 
-        # plot is true if this is the first minibatch of the epoch and is main process
-        epoch = self.state.epoch % 1 == 0
-        is_main_process = self.accelerator.is_main_process
-        is_training = model.training
-        plot = epoch and is_main_process and is_training
+        # # plot is true if this is the first minibatch of the epoch and is main process
+        # epoch = self.state.epoch % 1 == 0
+        # is_main_process = self.accelerator.is_main_process
+        # is_training = model.training
+        # if epoch and is_main_process:
+        #     if is_training:
+        #         plot = "train"
+        #     else:
+        #         plot = "eval"
+        # else:
+        #     plot = None
 
-        loss = self._compute_loss(outputs, features, labels, model, plot)
+        loss = self._compute_loss(outputs, features, labels, model, self.plot)
+
+        # Workaround for logging matrix only on the first batch
+        if self.plot is not None:
+            self.plot = None
+
         self._log_epoch_wise_predictions(outputs, labels)
 
         return (loss, outputs) if return_outputs else loss
@@ -370,7 +385,7 @@ class LogTrainer(Trainer):
 
 
 
-    def _compute_loss(self, outputs, features, labels, model, plot=False):
+    def _compute_loss(self, outputs, features, labels, model, plot=None):
         """
         Compute the loss using either MSE or kernelized supervised contrastive loss.
 

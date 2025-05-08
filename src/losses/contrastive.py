@@ -50,7 +50,7 @@ def kernelized_supcon_loss(
     contrast_mode: str = 'all',
     base_temperature: float = 0.07,
     delta_reduction: str = 'sum',
-    plot: bool = False,
+    plot: str = None,
     accelerator=None,
     epoch=None,
 ):

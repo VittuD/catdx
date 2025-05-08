@@ -3,29 +3,14 @@ import os
 import torch
 
 # Function to perform inference and collect predictions for each partition
-def perform_inference(dataset, splits, trainer):
+def perform_inference(dataset, trainer):
     """
     Performs inference on each available split in the dataset using the trainer.
     Returns a dictionary with raw prediction outputs per split.
     """
-    raw_results = {}
-    available_splits = dataset.keys()
+    predictions = trainer.custom_predict_loop(dataset)
 
-    for split in splits:
-        if split not in available_splits:
-            print(f"Skipping {split} partition since it does not exist in the dataset.")
-            continue
-        print(f"Performing inference on {split} partition...")
-        # predictions = trainer.predict(dataset[split])
-        # raw_results[split] = predictions
-
-        predictions = trainer.custom_predict_loop(dataset[split])
-        raw_results[split] = predictions
-
-        # Clear CUDA cache
-        torch.cuda.empty_cache()
-
-    return raw_results
+    return predictions
 
 def process_predictions(raw_results):
     """
@@ -77,13 +62,13 @@ def load_predictions(csv_file):
     return pd.read_csv(csv_file)
 
 # Callable function to run the entire process and return paths of generated CSVs
-def run_inference_and_save(dataset, trainer, output_dir, splits=['train', 'validation', 'test']):
+def run_inference_and_save(dataset, trainer, output_dir):
 
     # Print available splits in the dataset
     print(f"Available splits in the dataset: {', '.join(dataset.keys())}")
 
     # Perform inference and collect predictions
-    results = perform_inference(dataset, splits, trainer)
+    results = perform_inference(dataset, trainer)
     
     # Process the raw results to extract actual and predicted labels
     results = process_predictions(results)

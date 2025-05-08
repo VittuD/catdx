@@ -26,7 +26,7 @@ docker service rm my_container
 ## Accelerate (Single Run, Multi GPU) Container
 To run the script using the Accelerate container on HSSH, use the following command:
 ```bash
-submit --name my_container --gpus N --mount $(pwd):/workspace eidos-service.di.unito.it/vitturini/vivit:accelerate
+submit --name vivit-contrastive --gpus 2 --mount $(pwd):/scratch/catdx  eidos-service.di.unito.it/vitturini/vivit:accelerate
 ```
 The script will use by default every GPU allocated to the container, everything else is the same as the Python container.
 
@@ -51,9 +51,44 @@ To run the multi-gpu training script from inside the container:
 ```bash
 accelerate launch -m src.scripts.main
 ```
+You can add arguments to the ```accelerate launch``` command, for example:
+```bash
+accelerate launch --num_processes 1 --mixed_precision fp16 -m src.scripts.main
+```
 
 ## Sweep Container
 ! WARNING: This container is not yet functional. It is a work in progress and should not be used for now.
+
+## Building and Pushing the Container
+To build the container, run the following command:
+```bash
+docker build -t eidos-service.di.unito.it/vitturini/vivit:base -f dockerfiles/Dockerfile_base .
+```
+To push the container to the repository, use:
+```bash
+docker push eidos-service.di.unito.it/vitturini/vivit:base
+```
+
+## Dataset format
+To make the code work as it is, the dataset must be in the following format:
+a dir with every video and a csv file with the labels.
+```
+dataset/
+|-- video1.mp4
+|-- video2.mp4
+...
+|-- videoN.mp4
+|-- all_files_with_partition.csv
+```
+
+The csv file must contain the following columns:
+- file_name: the name of the video file with the extension (e.g., video1.mp4)
+- CO: the label for the CO
+- Every other label 
+- partition: the partition of the video (train, val, test)
+
+Nevertheless, the code uses the `Huggingface Datasets` library, so it is possible to use any dataset format supported by the library with a limited amount of work. 
+
 
 ## WARNINGS
 - A refactoring of the code is scheduled soon.

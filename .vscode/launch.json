@@ -5,6 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Main Accelerate",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "accelerate.commands.launch",
+            "console": "integratedTerminal",
+            "args": [
+                "--num_processes",
+                "1",
+                // "--mixed_precision",
+                // "fp16",
+                "-m",
+                "src.scripts.main",
+            ],
+            "justMyCode": false
+        },
+        {
             "name": "Python Debugger: Report Module",
             "type": "debugpy",
             "request": "launch",
@@ -26,20 +42,6 @@
             //     "--is_unsupervised",
             //     "true"
             // ],
-            "justMyCode": false
-        },
-        {
-            "name": "Python Debugger: Main Accelerate",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "accelerate.commands.launch",
-            "console": "integratedTerminal",
-            "args": [
-                // "--num_processes",
-                // "2",
-                "-m",
-                "src.scripts.main",
-            ],
             "justMyCode": false
         },
     ]

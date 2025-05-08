@@ -7,4 +7,4 @@ RUN mkdir -p /scratch/catdx
 WORKDIR /scratch/catdx
 
 # Set vscode as the entrypoint
-ENTRYPOINT ["accelerate", "launch", "-m" ,"src.scripts.main"]
+ENTRYPOINT ["accelerate", "launch", "--mixed_precision", "fp16", "-m" ,"src.scripts.main"]

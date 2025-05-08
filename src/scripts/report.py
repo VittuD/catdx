@@ -3,13 +3,14 @@ import sys
 import argparse
 import json
 
-from src.utils.utils import load_dataset, get_image_processor, collate_fn, compute_metrics
+from src.utils.utils import load_dataset, get_image_processor, collate_fn
 from src.models.model_utils import VivitWithOptionalProjectionHead
 from src.trainers.trainer import LogTrainer
 from src.models.model_testing import run_inference_and_save
 from src.scripts.prediction_analysis import generate_predictions_report
 from transformers import VivitConfig, HfArgumentParser
 from src.trainers.TrainingArguments_projection import TrainingArguments_projection
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -30,20 +31,33 @@ def main():
     checkpoint_dir = os.path.abspath(args.checkpoint_dir)
     
     # The run directory is assumed to be the parent of the checkpoint directory.
-    run_dir = os.path.dirname(checkpoint_dir)
+    # run_dir = os.path.dirname(checkpoint_dir)
+    run_dir = os.path.dirname(os.path.dirname(os.path.dirname(checkpoint_dir)))
     
     # Load JSON configs from the run directory.
-    trainer_config_file = os.path.join(run_dir, "trainer_config.json")
+    trainer_config_json = os.path.join(run_dir, "trainer_config.json")
     model_config_file   = os.path.join(run_dir, "model_config.json")
     config_file         = os.path.join(run_dir, "config.json")
     
-    for fname in [trainer_config_file, model_config_file, config_file]:
+    # Training arguments: using HfArgumentParser to load from trainer_config_file.
+    parser = HfArgumentParser(TrainingArguments_projection)
+
+    # Check if the bin or json file exists, assign trainer_config_file accordingly.
+    if os.path.exists(trainer_config_json):
+        trainer_config_file = trainer_config_json   
+        with open(trainer_config_file, "r") as f:
+            trainer_config = json.load(f)
+        training_args, = parser.parse_json_file(json_file=trainer_config_file, allow_extra_keys=True)
+
+    else:
+        print(f"Error: Expected file {trainer_config_json} not found.")
+        sys.exit(1)
+
+    for fname in [model_config_file, config_file]:
         if not os.path.exists(fname):
             print(f"Error: Expected file {fname} not found.")
             sys.exit(1)
-    
-    with open(trainer_config_file, "r") as f:
-        trainer_config = json.load(f)
+
     with open(config_file, "r") as f:
         run_config = json.load(f)
     
@@ -64,15 +78,10 @@ def main():
         ignore_mismatched_sizes=True
     )
     model.to("cuda")
-    print(model)
     # Print named parameters
     for name, param in model.named_parameters():
         print(name, param.size())
     print(f"Loaded model from checkpoint: {checkpoint_dir}")
-    
-    # Training arguments: using HfArgumentParser to load from trainer_config_file.
-    parser = HfArgumentParser(TrainingArguments_projection)
-    training_args, = parser.parse_json_file(json_file=trainer_config_file, allow_extra_keys=True)
     
     # Create the trainer.
     trainer = LogTrainer(
