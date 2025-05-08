@@ -28,7 +28,7 @@ trainer_config:
   do_eval: true
   do_predict: true
   is_unsupervised: true
-  dataset_folder: data/fix_apical4
+  dataset_folder: fix_apical4
   training_mode: end_to_end_contrastive
   eval_strategy: epoch
   fp16: true
