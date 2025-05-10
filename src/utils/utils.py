@@ -7,7 +7,8 @@ from PIL import Image
 import cv2
 import os
 import pandas as pd
-from datasets import Dataset, Features, Value, Video, DatasetDict
+from pathlib import Path
+from datasets import Dataset, Features, Value, Video, Array4D, DatasetDict
 
 
 def safe_cat(existing, new):
@@ -54,10 +55,8 @@ def create_datasets(csv_file, video_folder):
         df["file_name"] = df["file_name"].apply(lambda x: os.path.abspath(os.path.join(video_folder, x)))
 
         features = Features({
-            "file_name": Video(),
+            "file_name": Video("string"),
             "CO": Value("float"),
-            "CI": Value("float"),
-            "PVR": Value("float"),
             "partition": Value("string"),
         })
 
@@ -85,7 +84,7 @@ def load_dataset(dataset_folder, augmentation=None):
     # dataset = dataset.rename_column('video', 'pixel_values')
 
     # New way, works with preprocessed/mp4/apical4 dir structure
-    dataset = create_datasets(os.path.join(dataset_folder, "all_files_with_partition.csv"), dataset_folder)
+    dataset = create_datasets(os.path.join(dataset_folder, "codebook_vivit.csv"), dataset_folder)
     dataset = dataset.rename_column('file_name', 'pixel_values')
 
     dataset = dataset.rename_column('CO', 'labels')
