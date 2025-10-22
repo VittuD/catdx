@@ -172,7 +172,7 @@ def compute_mse(predictions, labels):
 
 def compute_r2(predictions, labels):
     metric = R2Score()
-    # metric.to("cuda")
+    metric.to(predictions.device)
     metric.update(predictions, labels)
     return metric.compute().item()
 
@@ -185,6 +185,11 @@ def compute_metrics(eval_pred):
     
     # if labels is a tuple take the first and convert to tensor
     labels = torch.tensor(labels[0]) if isinstance(labels, tuple) else labels
+
+    # Ensure predictions and labels are on the same device
+    if predictions.device != labels.device:
+        labels = labels.to(predictions.device)
+
     # Compute Pearson correlation using torch.corrcoef
     pearson_corr = torch.corrcoef(torch.stack((predictions.flatten(), labels.flatten())))[0, 1].item()
 
