@@ -62,7 +62,7 @@ def create_datasets(csv_file, video_folder):
 
         dataset = Dataset.from_pandas(df, features=features)
         train_dataset = dataset.filter(lambda x: x["partition"] == "train")
-        val_dataset = dataset.filter(lambda x: x["partition"] == "val")
+        val_dataset = dataset.filter(lambda x: x["partition"] == "validation")
         test_dataset = dataset.filter(lambda x: x["partition"] == "test")
         
         
@@ -150,6 +150,7 @@ def convert_to_grayscale(video_frames):
         grayscale_frames.append(np_frame)
     return grayscale_frames
 
+# TODO Implement random crop of num_frames instead of center crop 
 def adjust_frames(frames, num_frames):
     # Adjust the number of frames to match num_frames (pad or truncate as needed)
     if len(frames) < num_frames:
@@ -171,7 +172,7 @@ def compute_mse(predictions, labels):
 
 def compute_r2(predictions, labels):
     metric = R2Score()
-    metric.to("cuda")
+    # metric.to("cuda")
     metric.update(predictions, labels)
     return metric.compute().item()
 

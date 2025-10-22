@@ -6,7 +6,7 @@ import wandb
 from src.models.model_testing import run_inference_and_save, save_results, process_predictions
 from src.scripts.prediction_analysis import generate_predictions_report
 import torch
-from transformers import VivitConfig, HfArgumentParser, TrainerCallback
+from transformers import VivitConfig, HfArgumentParser, TrainerCallback, EarlyStoppingCallback
 from src.trainers.TrainingArguments_projection import TrainingArguments_projection
 import hydra
 from omegaconf import DictConfig
@@ -268,6 +268,11 @@ def main(cfg: DictConfig):
     parser = HfArgumentParser(TrainingArguments_projection)
     training_args, = parser.parse_json_file(json_file=trainer_json, allow_extra_keys=True)
 
+    early_stopping_callback = EarlyStoppingCallback(
+        early_stopping_patience=15,
+        early_stopping_threshold=0.0
+    )
+
     # Create Trainer
     trainer = LogTrainer(
         model,
@@ -275,10 +280,10 @@ def main(cfg: DictConfig):
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
         data_collator = lambda examples: collate_fn(examples, image_processor, cfg.model_config.num_channels),
-        # callbacks=[MyCallback(trainer)],
     )
 
     trainer.add_callback(MyCallback(trainer))
+    trainer.add_callback(early_stopping_callback)
 
     if cfg.trainer_config.gather_loss:
         model, trainer = accelerator.prepare(model, trainer)

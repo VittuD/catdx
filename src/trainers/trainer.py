@@ -179,6 +179,8 @@ class LogTrainer(Trainer):
             if self.epoch_wise_predictions.numel() > 0 and self.epoch_wise_labels.numel() > 0:
                 # If logs has a key with "eval" in it, set prefix to "eval_"
                 prefix = "eval_" if any("eval" in key for key in logs.keys()) else ""
+                # DEBUG_ print the shapes and types of predictions and labels
+                print(f"Epoch-wise predictions shape: {self.epoch_wise_predictions.shape}, type: {type(self.epoch_wise_predictions)}; Epoch-wise labels shape: {self.epoch_wise_labels.shape}, type: {type(self.epoch_wise_labels)}")
                 logs[f"{prefix}r2"] = compute_r2(self.epoch_wise_predictions, self.epoch_wise_labels)
                 logs[f"{prefix}pearson"] = float(pearsonr(self.epoch_wise_predictions, self.epoch_wise_labels)[0])
                 logs[f"{prefix}mae"] = compute_mae(self.epoch_wise_predictions, self.epoch_wise_labels)
@@ -191,8 +193,6 @@ class LogTrainer(Trainer):
     def mse_loss(self, outputs, labels):
         predictions = (lambda x: x.unsqueeze(0) if x.dim() == 0 else x)(outputs["logits"].squeeze())
         loss = torch.nn.functional.mse_loss(predictions, labels)
-        self.epoch_wise_predictions = torch.cat((self.epoch_wise_predictions, predictions.detach().cpu()))
-        self.epoch_wise_labels = torch.cat((self.epoch_wise_labels, labels.detach().cpu()))
         return loss
 
     def compute_loss(self, model, inputs, num_items_in_batch=1, return_outputs=False):

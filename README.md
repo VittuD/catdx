@@ -18,8 +18,9 @@ To run the script using the Accelerate container on HSSH, use the following comm
 submit \
   --name vivit-contrastive \
   --gpus N \
+  --host hssh2 \
   --mount "$(pwd)":/scratch/catdx \
-  --mount /home/vitturini/shared/fix_apical4:/scratch/catdx/fix_apical4 \
+  --mount /home/vitturini/shared/RVENetCropRszMp4:/scratch/catdx/RVENetCropRszMp4 \
   eidos-service.di.unito.it/vitturini/vivit:accelerate
 ```
 The script will use by default every GPU allocated to the container, everything else is the same as the Python container.

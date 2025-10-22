@@ -18,7 +18,7 @@ model_config:
     - ${model_config.num_frames}
     - ${model_config.image_size}
     - ${model_config.image_size}
-  model_name_or_path: "google/vivit-b-16x2"
+  model_name_or_path: "/scratch/catdx/outputs/2025-05-10/19-39-08/cone2eunsup_sz224_lr1e-05_cs0.15_wd0.001_2/checkpoint-14000"
 
 trainer_config:
   auto_find_batch_size: false
@@ -28,27 +28,27 @@ trainer_config:
   do_eval: true
   do_predict: true
   is_unsupervised: true
-  dataset_folder: fix_apical4
+  dataset_folder: RVENetCropRszMp4
   training_mode: end_to_end_contrastive
   eval_strategy: epoch
   fp16: true
   kernel_type: gaussian
   learning_rate: 1e-5
-  logging_first_step: true
   logging_strategy: epoch
   lr_scheduler_type: step
   lr_scheduler_kwargs:
     step_size_epochs: 0.2
     gamma: 0.5
   metric_for_best_model: loss
-  num_train_epochs: 500
-  per_device_eval_batch_size: 8
-  per_device_train_batch_size: 8
+  num_train_epochs: 0
+  per_device_eval_batch_size: 16
+  per_device_train_batch_size: 16
   remove_unused_columns: false
   report_to: wandb
   resize_to: 224
   resume_from_checkpoint: false
   output_dir: ${experiment_name}
-  save_strategy: epoch
-  warmup_steps: 26
+  save_strategy: steps
+  save_steps: 500
+  warmup_steps: 0
   weight_decay: 1e-3
