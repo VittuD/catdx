@@ -1,5 +1,6 @@
 experiment_name: auto
 secrets_file: /scratch/catdx/.secrets
+random_clip_start: false
 
 model_config:
   attention_probs_dropout_prob: 0.0
@@ -27,6 +28,10 @@ trainer_config:
   contrastive_method: expw
   do_eval: true
   do_predict: true
+  early_stopping:
+    use_early_stopping: false
+    early_stopping_patience: 10
+    early_stopping_threshold: 0.0
   is_unsupervised: true
   dataset_folder: fix_apical4
   training_mode: end_to_end_contrastive
@@ -49,6 +54,6 @@ trainer_config:
   resize_to: 224
   resume_from_checkpoint: false
   output_dir: ${experiment_name}
-  save_strategy: epoch
+  save_strategy: best
   warmup_steps: 26
   weight_decay: 1e-3
