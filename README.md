@@ -62,7 +62,7 @@ accelerate launch --num_processes 1 --mixed_precision fp16 -m src.scripts.main
 ## Building and Pushing the Container
 To build the container, run the following command:
 ```bash
-docker build -t eidos-service.di.unito.it/vitturini/vivit:base -f dockerfiles/Dockerfile_base .
+docker build -t eidos-service.di.unito.it/vitturini/vivit:base -f docker/Dockerfile_base .
 ```
 To push the container to the repository, use:
 ```bash

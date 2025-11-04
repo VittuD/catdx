@@ -10,6 +10,7 @@ import pandas as pd
 from pathlib import Path
 from datasets import Dataset, Features, Value, Video, Array4D, DatasetDict
 
+TARGET_FPS = 24
 
 def safe_cat(existing, new):
     # Return early if one of the inputs is None or empty
@@ -31,7 +32,6 @@ def safe_cat(existing, new):
         new = torch.cat(new, dim=0)
 
     return torch.cat([existing, new], dim=0)
-
 
 def get_image_processor(resize_to, num_channels):
     # Generate a list with num_channels times elements (Imagenet standard normalization)
@@ -101,25 +101,67 @@ def collate_fn(examples, image_processor, num_channels):
     return {"pixel_values": pixel_values, "labels": labels}
 
 def preprocess_example(example, image_processor, num_channels=1, num_frames=32):
-    # NEW Huggingface release: video is a torchvision VideoReader object
+    # Decode frames from the HF Datasets Video object
     video = example['pixel_values']
-    
-    # Convert video frames to NumPy arrays using the as_numpy helper
-    original_frames = as_numpy(video)
-    
+
+    # Frames (+ optional timestamps)
+    original_frames, times = as_numpy_with_times(video)
+
+    # Try to get fps; if not available from metadata, estimate from timestamps
+    src_fps = get_video_fps_safe(video)
+    if src_fps is None:
+        est = infer_fps_from_times(times)
+        if est is not None:
+            src_fps = est
+
+    # To 1-channel if requested
     if num_channels == 1:
         original_frames = convert_to_grayscale(original_frames)
-    
-    frames = original_frames
-    
-    # Adjust the number of frames to match num_frames (pad or truncate as needed)
-    frames = adjust_frames(frames, num_frames)
 
-    # Normalize from [0, 255] to [0, 1]
+    frames = temporal_resample(
+        original_frames,
+        src_fps=src_fps,
+        target_fps=TARGET_FPS,
+        out_len=num_frames
+    )
+    if frames is None:
+        # no timing info: fall back to old behavior (truncate/repeat)
+        frames = adjust_frames(original_frames, num_frames)
+
+    # Normalize to [0,1] and package
     frames = [frame / 255.0 for frame in frames]
-    
     processed_video = image_processor(frames, return_tensors='pt')
     return processed_video['pixel_values']
+
+def get_video_fps_safe(video):
+    """
+    Try multiple ways to read FPS from the video object (HF/Decord/TorchVision-like).
+    Returns float or None if unavailable.
+    """
+    # 1) torchvision VideoReader-style
+    try:
+        if hasattr(video, "get_metadata"):
+            meta = video.get_metadata()
+            fps = None
+            # torchvision returns dicts with lists
+            if isinstance(meta, dict):
+                vmeta = meta.get("video", {}) if "video" in meta else meta
+                fps = vmeta.get("fps", None)
+                if isinstance(fps, (list, tuple)) and fps:
+                    return float(fps[0])
+                if isinstance(fps, (int, float)):
+                    return float(fps)
+    except Exception:
+        pass
+
+    # 2) direct attribute
+    try:
+        if hasattr(video, "fps"):
+            return float(video.fps)
+    except Exception:
+        pass
+
+    return None
 
 def as_numpy(video):
     frames = []
@@ -130,6 +172,57 @@ def as_numpy(video):
         # Convert tensor to NumPy array immediately
         frames.append(tensor_frame.numpy())
     return frames
+
+def as_numpy_with_times(video):
+    """
+    Like as_numpy(), but tries to carry per-frame timestamps if present.
+    Falls back to None timestamps.
+    """
+    frames, times = [], []
+    for fr in video:
+        # HF Datasets Video yields dict-like frames
+        data = fr["data"]
+        frames.append(data.cpu().numpy())
+        t = fr.get("time", None)  # some backends expose 'time' in seconds
+        if t is None:
+            # last resort: some expose pts; we can’t safely scale without time_base, so ignore
+            t = None
+        times.append(t)
+    return frames, times
+
+def infer_fps_from_times(times):
+    """
+    Estimate FPS from per-frame times (seconds). Returns float or None.
+    """
+    valid = [t for t in times if isinstance(t, (int, float))]
+    if len(valid) < 3:
+        return None
+    diffs = [b - a for a, b in zip(valid[:-1], valid[1:]) if b is not None and a is not None and b > a]
+    if not diffs:
+        return None
+    # median is robust to jitter
+    med = np.median(diffs)
+    return float(1.0 / med) if med > 0 else None
+
+def temporal_resample(frames, src_fps, target_fps, out_len):
+    """
+    Resample frames to cover a fixed real-time duration = out_len / target_fps seconds.
+    If src_fps is None, we fall back later.
+    """
+    if not src_fps or src_fps <= 0:
+        return None  # signal caller to fall back
+
+    src_len = len(frames)
+    src_duration = src_len / src_fps
+    out_duration = out_len / target_fps
+
+    # Centered crop in time, then uniform sampling
+    use_duration = min(src_duration, out_duration)
+    start_t = max(0.0, (src_duration - use_duration) * 0.5)
+    sample_times = np.linspace(start_t, start_t + use_duration, num=out_len, endpoint=False)
+    idx = (sample_times * src_fps).astype(int)
+    idx = np.clip(idx, 0, src_len - 1)
+    return [frames[i] for i in idx]
 
 def convert_to_grayscale(video_frames):
     # video_frames is now a list of NumPy arrays.
@@ -156,6 +249,9 @@ def adjust_frames(frames, num_frames):
     if len(frames) < num_frames:
         frames = frames * (num_frames // len(frames)) + frames[:num_frames % len(frames)]
     else:
+        # Generate random start between 0 and len(frames) - num_frames
+        # random_start = np.random.randint(0, len(frames) - num_frames + 1)
+        # frames = frames[random_start:random_start + num_frames]
         frames = frames[:num_frames]
     return frames
 

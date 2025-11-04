@@ -157,8 +157,9 @@ def train_regression_head(cfg, dataset, model):
     cfg.trainer_config.auto_find_batch_size = True
     cfg.trainer_config.num_train_epochs = 500
     cfg.trainer_config.learning_rate = 5e-3
-    cfg.trainer_config.weight_decay = 0
+    cfg.trainer_config.weight_decay = 1e-3
     cfg.trainer_config.is_unsupervised = False
+    cfg.trainer_config.save_strategy = 'best'
 
     parser = HfArgumentParser(TrainingArguments_projection)
     training_args, = parser.parse_dict(cfg.trainer_config, allow_extra_keys=True)
@@ -268,11 +269,6 @@ def main(cfg: DictConfig):
     parser = HfArgumentParser(TrainingArguments_projection)
     training_args, = parser.parse_json_file(json_file=trainer_json, allow_extra_keys=True)
 
-    early_stopping_callback = EarlyStoppingCallback(
-        early_stopping_patience=15,
-        early_stopping_threshold=0.0
-    )
-
     # Create Trainer
     trainer = LogTrainer(
         model,
@@ -283,7 +279,13 @@ def main(cfg: DictConfig):
     )
 
     trainer.add_callback(MyCallback(trainer))
-    trainer.add_callback(early_stopping_callback)
+
+    if getattr(cfg.trainer_config, "use_early_stopping", False):
+        early_stopping_callback = EarlyStoppingCallback(
+            early_stopping_patience=cfg.trainer_config.early_stopping.early_stopping_patience,
+            early_stopping_threshold=cfg.trainer_config.early_stopping.early_stopping_threshold
+        )
+        trainer.add_callback(early_stopping_callback)
 
     if cfg.trainer_config.gather_loss:
         model, trainer = accelerator.prepare(model, trainer)
