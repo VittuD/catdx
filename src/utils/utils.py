@@ -118,6 +118,7 @@ def preprocess_example(example, image_processor, num_channels=1, num_frames=32):
     if num_channels == 1:
         original_frames = convert_to_grayscale(original_frames)
 
+    # --- FPS normalization to a hard-coded 24 fps ---
     frames = temporal_resample(
         original_frames,
         src_fps=src_fps,
@@ -127,6 +128,7 @@ def preprocess_example(example, image_processor, num_channels=1, num_frames=32):
     if frames is None:
         # no timing info: fall back to old behavior (truncate/repeat)
         frames = adjust_frames(original_frames, num_frames)
+    # ------------------------------------------------
 
     # Normalize to [0,1] and package
     frames = [frame / 255.0 for frame in frames]
